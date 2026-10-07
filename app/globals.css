@@ -29,6 +29,7 @@
   --ongoing-b: #ebe8f4;
   --glow-a: rgba(201, 138, 26, 0.08);
   --glow-b: rgba(61, 111, 166, 0.07);
+  --brand-accent: #c07e12;
   color-scheme: light;
 
   --danger: #b4453f;
@@ -113,6 +114,7 @@
     --ongoing-b: #1b1a22;
     --glow-a: rgba(223, 170, 94, 0.06);
     --glow-b: rgba(134, 173, 224, 0.06);
+    --brand-accent: #e6b467;
     color-scheme: dark;
   }
 }
@@ -163,6 +165,7 @@
   --ongoing-b: #1b1a22;
   --glow-a: rgba(223, 170, 94, 0.06);
   --glow-b: rgba(134, 173, 224, 0.06);
+  --brand-accent: #e6b467;
   color-scheme: dark;
 }
 
@@ -555,9 +558,10 @@ select.field:disabled {
   place-items: center;
   font-family: var(--font-serif-stack);
   font-style: italic;
-  font-size: 19px;
+  font-size: 15px;
   line-height: 1;
-  padding-bottom: 2px;
+  letter-spacing: -0.02em;
+  padding: 0 1px 1px 0;
   box-shadow: var(--shadow-sm);
 }
 
@@ -566,6 +570,13 @@ select.field:disabled {
   font-size: 21px;
   letter-spacing: -0.015em;
   line-height: 1;
+}
+
+/* "ai" di Traicker = nama panggilan pemilik, jadi dibuat menonjol. */
+.brand-name em {
+  font-style: italic;
+  color: var(--brand-accent);
+  padding-right: 0.02em;
 }
 
 .nav-label {
@@ -1828,7 +1839,7 @@ select.field:disabled {
   width: 40px;
   height: 40px;
   border-radius: var(--r-sm);
-  font-size: 26px;
+  font-size: 21px;
   margin-bottom: 28px;
 }
 
@@ -1842,7 +1853,8 @@ select.field:disabled {
 }
 
 .auth-title em {
-  color: var(--muted);
+  color: var(--brand-accent);
+  padding-right: 0.02em;
 }
 
 .auth-sub {

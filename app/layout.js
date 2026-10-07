@@ -7,7 +7,7 @@ const mono = Geist_Mono({ subsets: ["latin"], variable: "--font-mono", display: 
 const serif = Instrument_Serif({ subsets: ["latin"], weight: "400", style: ["normal", "italic"], variable: "--font-serif", display: "swap" });
 
 export const metadata = {
-  title: "Task Tracker",
+  title: "Traicker",
   description: "Tracker tugas internal untuk klien dan proyek berjalan.",
 };
 

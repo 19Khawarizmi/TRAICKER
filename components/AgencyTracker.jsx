@@ -515,8 +515,8 @@ export default function AgencyTracker() {
       {/* ---------- Sidebar ---------- */}
       <aside className="sidebar">
         <div className="brand">
-          <div className="brand-mark">t</div>
-          <div className="brand-name">Task Tracker</div>
+          <div className="brand-mark" aria-hidden="true">Ai</div>
+          <div className="brand-name">Tr<em>ai</em>cker</div>
         </div>
 
         <nav>

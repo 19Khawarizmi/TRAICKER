@@ -19,7 +19,7 @@ function friendlyError(code, fallback) {
 export function Splash({ label = "Memuat…" }) {
   return (
     <div className="splash">
-      <div className="brand-mark auth-mark" style={{ margin: 0 }}>t</div>
+      <div className="brand-mark auth-mark" style={{ margin: 0 }} aria-hidden="true">Ai</div>
       {label}
     </div>
   );
@@ -72,9 +72,9 @@ export default function AuthGate({ children }) {
         <Icon name={resolvedTheme === "dark" ? "sun" : "moon"} />
       </button>
       <div className="auth-card">
-        <div className="brand-mark auth-mark">t</div>
+        <div className="brand-mark auth-mark" aria-hidden="true">Ai</div>
         <h1 className="auth-title">
-          Task <em>Tracker</em>
+          Tr<em>ai</em>cker
         </h1>
         <p className="auth-sub">Semua pekerjaan klien, di satu papan yang tenang.</p>
 
