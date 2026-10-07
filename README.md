@@ -1,6 +1,6 @@
 # Traicker
 
-Task tracker internal Up+Above, dibangun dengan Next.js (App Router). Data tersimpan di Supabase (Postgres + Storage), login pakai magic link.
+Task tracker internal Up+Above, dibangun dengan Next.js (App Router). Data tersimpan di Supabase (Postgres + Storage), login pakai email + password.
 
 ## Menjalankan secara lokal
 
@@ -25,7 +25,7 @@ npm run start
 - `app/layout.js` — root layout dan metadata halaman.
 - `app/page.js` — halaman utama, me-render tracker di dalam gerbang login.
 - `app/globals.css` — reset dasar dan font.
-- `components/AuthGate.jsx` — form login magic link; tracker hanya tampil kalau sudah login.
+- `components/AuthGate.jsx` — form login email + password; tracker hanya tampil kalau sudah login.
 - `components/AgencyTracker.jsx` — komponen utama: board kanban per klien, subtask, notifikasi tenggat, drag-and-drop antar kolom.
 - `lib/supabase.js` — client Supabase.
 - `lib/trackerData.js` — fungsi baca/tulis klien, tugas, subtask, dan lampiran.
@@ -33,5 +33,5 @@ npm run start
 
 ## Catatan
 
-- Akses data hanya untuk user yang login. Pendaftaran publik dimatikan; anggota tim diundang lewat dashboard Supabase (Authentication → Users → Invite).
+- Akses data hanya untuk user yang login. Pendaftaran publik dimatikan; akun anggota tim dibuat lewat dashboard Supabase (Authentication → Users → Add user → Create new user, centang Auto Confirm).
 - Lampiran subtask disimpan di bucket privat `attachments` (maks 4MB per file) dan diunduh lewat signed URL.
