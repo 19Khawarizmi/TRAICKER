@@ -1,17 +1,8 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-
-const CLIENTS = [
-  { id: "immfc", name: "IMMFC Connect 2026", short: "IMMFC", color: "#0E7C7B", tint: "#E4F3F1" },
-  { id: "iffina", name: "IFFINA+", short: "IFFINA", color: "#3D6FA6", tint: "#E5EDF6" },
-  { id: "ihfi", name: "IHFI", short: "IHFI", color: "#8B6A3F", tint: "#F1EAE0" },
-  { id: "interzum", name: "Interzum Jakarta", short: "Interzum", color: "#5A7D3A", tint: "#EAF0E2" },
-  { id: "denspace", name: "Ferdinand / Den&space", short: "Den&space", color: "#C97A1A", tint: "#FBEEDD" },
-  { id: "idw", name: "IDW 2026", short: "IDW", color: "#5B4EA8", tint: "#ECE9F7" },
-  { id: "tapaktumbuh", name: "Tapak Tumbuh (JIA Curated)", short: "Tapak Tumbuh", color: "#B4453F", tint: "#F8E9E8" },
-  { id: "internal", name: "Internal / Up+Above", short: "Internal", color: "#6B6A64", tint: "#EEEDE8" },
-];
+import { supabase } from "@/lib/supabase";
+import * as db from "@/lib/trackerData";
 
 const COLUMNS = [
   { id: "todo", label: "Perlu Dikerjakan" },
@@ -26,78 +17,6 @@ const PRIORITIES = {
   Sedang: "#C97A1A",
   Rendah: "#6B6A64",
 };
-
-const STORAGE_KEY = "agency-tracker-tasks";
-
-const seedTasks = () => [
-  { id: "t1", title: "Content plan IG/LinkedIn Agustus", client: "immfc", priority: "Tinggi", due: "2026-08-05", column: "progress", subtasks: [
-    { id: "t1-s1", text: "Request kalender event IMMFC Agustus", done: false },
-    { id: "t1-s2", text: "Request moodboard visual dari klien", done: false },
-  ] },
-  { id: "t2", title: "Executive summary deck", client: "immfc", priority: "Sedang", due: "2026-08-01", column: "review", subtasks: [
-    { id: "t2-s1", text: "Ambil data performa Q2", done: true },
-    { id: "t2-s2", text: "Approval logo terbaru", done: false },
-  ] },
-  { id: "t3", title: "Mailchimp performance review deck", client: "immfc", priority: "Rendah", due: "2026-07-20", column: "done", subtasks: [
-    { id: "t3-s1", text: "Export data open rate & CTR dari Mailchimp", done: true },
-  ] },
-  { id: "t4", title: "Analisis penempatan billboard OOH Jakarta", client: "interzum", priority: "Sedang", due: "2026-08-10", column: "todo", subtasks: [
-    { id: "t4-s1", text: "Konfirmasi budget OOH", done: false },
-    { id: "t4-s2", text: "Daftar lokasi prioritas dari klien", done: false },
-  ] },
-  { id: "t5", title: "Ad copy LinkedIn targeting exhibitor", client: "iffina", priority: "Rendah", due: "2026-07-22", column: "done", subtasks: [
-    { id: "t5-s1", text: "Referensi profil exhibitor target", done: true },
-    { id: "t5-s2", text: "Tone of voice brand", done: true },
-  ] },
-  { id: "t5b", title: "Carousel post Halal Bi Halal", client: "ihfi", priority: "Rendah", due: "2026-07-18", column: "done", subtasks: [
-    { id: "t5b-s1", text: "Foto dokumentasi acara dari klien", done: true },
-  ] },
-  { id: "t6", title: "VO script video ad - positioning client-side consultant", client: "denspace", priority: "Tinggi", due: "2026-08-02", column: "progress", subtasks: [
-    { id: "t6-s1", text: "Brief positioning terbaru", done: true },
-    { id: "t6-s2", text: "Referensi tone VO", done: false },
-  ] },
-  { id: "t7", title: "Laporan performa sosmed - Juni", client: "denspace", priority: "Rendah", due: "2026-07-15", column: "done", subtasks: [
-    { id: "t7-s1", text: "Data insight IG bulan Juni", done: true },
-    { id: "t7-s2", text: "Data insight TikTok bulan Juni", done: true },
-  ] },
-  { id: "t8", title: "Deck optimasi ads flow (click-to-chat gap)", client: "denspace", priority: "Tinggi", due: "2026-07-31", column: "review", subtasks: [
-    { id: "t8-s1", text: "Akses Meta Ads Manager", done: true },
-    { id: "t8-s2", text: "Data funnel click-to-chat", done: true },
-  ] },
-  { id: "t9", title: "Template WhatsApp automation", client: "denspace", priority: "Sedang", due: "2026-08-08", column: "todo", subtasks: [
-    { id: "t9-s1", text: "List pertanyaan FAQ", done: false },
-    { id: "t9-s2", text: "Alur respons dari tim sales klien", done: false },
-  ] },
-  { id: "t10", title: "Content plan Juli dari script library", client: "denspace", priority: "Sedang", due: "2026-08-01", column: "progress", subtasks: [
-    { id: "t10-s1", text: "Akses script library", done: true },
-    { id: "t10-s2", text: "Jadwal posting yang disepakati", done: false },
-  ] },
-  { id: "t11", title: "Brief signage Townhall Totem", client: "idw", priority: "Sedang", due: "2026-08-12", column: "todo", subtasks: [
-    { id: "t11-s1", text: "Denah lokasi totem", done: false },
-    { id: "t11-s2", text: "Ukuran signage dari venue", done: false },
-  ] },
-  { id: "t12", title: "Icon set template Instagram", client: "idw", priority: "Rendah", due: "2026-08-06", column: "progress", subtasks: [
-    { id: "t12-s1", text: "Request brand guideline warna IDW 2026", done: true },
-    { id: "t12-s2", text: "Request brand guideline font IDW 2026", done: false },
-  ] },
-  { id: "t13", title: "Dokumen partnership guideline (sizing + bilingual copy)", client: "idw", priority: "Tinggi", due: "2026-08-03", column: "review", subtasks: [
-    { id: "t13-s1", text: "Copy final versi Inggris", done: true },
-    { id: "t13-s2", text: "Copy final versi Indonesia", done: true },
-    { id: "t13-s3", text: "Review legal", done: false },
-  ] },
-  { id: "t14", title: "Brief teaser video 15 detik (4 frame)", client: "tapaktumbuh", priority: "Tinggi", due: "2026-08-04", column: "progress", subtasks: [
-    { id: "t14-s1", text: "Storyboard 4 frame", done: true },
-    { id: "t14-s2", text: "Referensi musik dari kurator JIA", done: false },
-  ] },
-  { id: "t15", title: "Sourcing stock footage", client: "tapaktumbuh", priority: "Sedang", due: "2026-08-05", column: "todo", subtasks: [
-    { id: "t15-s1", text: "Konfirmasi budget lisensi footage", done: false },
-    { id: "t15-s2", text: "Tema visual yang dibutuhkan", done: false },
-  ] },
-  { id: "t16", title: "Rencana konten sosial kolaborator", client: "tapaktumbuh", priority: "Rendah", due: "2026-08-09", column: "todo", subtasks: [
-    { id: "t16-s1", text: "Daftar kolaborator", done: false },
-    { id: "t16-s2", text: "Handle sosial media masing-masing", done: false },
-  ] },
-];
 
 function getTodayStr() {
   const now = new Date();
@@ -124,7 +43,9 @@ function daysUntil(d, todayStr) {
 
 export default function AgencyTracker() {
   const [tasks, setTasks] = useState([]);
+  const [clients, setClients] = useState([]);
   const [loaded, setLoaded] = useState(false);
+  const [loadError, setLoadError] = useState("");
   const [activeClient, setActiveClient] = useState("all");
   const [query, setQuery] = useState("");
   const [dragId, setDragId] = useState(null);
@@ -136,37 +57,36 @@ export default function AgencyTracker() {
   const [sortBy, setSortBy] = useState("default");
   const [newSubtask, setNewSubtask] = useState("");
   const [expandedSubtask, setExpandedSubtask] = useState(null);
-  const saveTimer = useRef(null);
+
+  async function loadBoard() {
+    try {
+      const board = await db.fetchBoard();
+      setClients(board.clients);
+      setTasks(board.tasks);
+      setLoadError("");
+    } catch (e) {
+      setLoadError(e.message || "Gagal memuat data");
+    }
+    setLoaded(true);
+  }
 
   useEffect(() => {
     setTodayStr(getTodayStr());
-    try {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        setTasks(JSON.parse(raw));
-      } else {
-        setTasks(seedTasks());
-      }
-    } catch (e) {
-      setTasks(seedTasks());
-    }
-    setLoaded(true);
+    loadBoard();
   }, []);
 
-  useEffect(() => {
-    if (!loaded) return;
+  // Update UI dulu (optimistic), lalu tulis ke Supabase. Kalau gagal, muat ulang dari server.
+  async function persist(write) {
     setSaveState("saving");
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => {
-      try {
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
-        setSaveState("saved");
-      } catch (e) {
-        setSaveState("error");
-      }
-    }, 400);
-    return () => clearTimeout(saveTimer.current);
-  }, [tasks, loaded]);
+    try {
+      await write();
+      setSaveState("saved");
+    } catch (e) {
+      console.error(e);
+      setSaveState("error");
+      loadBoard();
+    }
+  }
 
   useEffect(() => {
     if (!loaded || notifiedRef.current || !todayStr) return;
@@ -192,11 +112,12 @@ export default function AgencyTracker() {
   }, [loaded, tasks, todayStr]);
 
   function clientOfStatic(id) {
-    const c = CLIENTS.find((x) => x.id === id);
+    const c = clients.find((x) => x.id === id);
     return c ? c.name : "";
   }
 
-  const clientOf = (id) => CLIENTS.find((c) => c.id === id) || CLIENTS[CLIENTS.length - 1];
+  const fallbackClient = { id: "", name: "", short: "", color: "#6B6A64", tint: "#EEEDE8" };
+  const clientOf = (id) => clients.find((c) => c.id === id) || clients[clients.length - 1] || fallbackClient;
 
   const visibleTasks = tasks
     .filter((t) => {
@@ -215,7 +136,7 @@ export default function AgencyTracker() {
       return 0;
     });
 
-  const counts = CLIENTS.reduce((acc, c) => {
+  const counts = clients.reduce((acc, c) => {
     acc[c.id] = tasks.filter((t) => t.client === c.id && t.column !== "done").length;
     return acc;
   }, {});
@@ -224,16 +145,22 @@ export default function AgencyTracker() {
   const overdueTasks = tasks.filter((t) => isOverdue(t.due, t.column, todayStr)).sort((a, b) => (a.due < b.due ? -1 : 1));
 
   function moveTask(id, column) {
+    const task = tasks.find((t) => t.id === id);
+    if (!task || task.column === column) return;
     setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, column } : t)));
+    persist(() => db.moveTask(id, column));
   }
 
   function deleteTask(id) {
+    const task = tasks.find((t) => t.id === id);
     setTasks((prev) => prev.filter((t) => t.id !== id));
     setModalOpen(false);
+    if (task) persist(() => db.deleteTask(task));
   }
 
   function openNew() {
-    setEditing({ id: null, title: "", client: CLIENTS[0].id, priority: "Sedang", due: todayStr, column: "todo", subtasks: [] });
+    // ID dibuat di client supaya lampiran bisa langsung di-upload sebelum tugas disimpan.
+    setEditing({ id: crypto.randomUUID(), isNew: true, title: "", client: clients[0]?.id, priority: "Sedang", due: todayStr, column: "todo", subtasks: [] });
     setNewSubtask("");
     setExpandedSubtask(null);
     setModalOpen(true);
@@ -254,28 +181,38 @@ export default function AgencyTracker() {
     setEditing((prev) => ({ ...prev, subtasks: prev.subtasks.map((s) => (s.id === id ? { ...s, [field]: value } : s)) }));
   }
 
-  function handleSubtaskFile(id, file) {
+  async function handleSubtaskFile(id, file) {
     if (!file) return;
     if (file.size > 4 * 1024 * 1024) {
       updateSubtaskField(id, "fileError", "File maks 4MB");
       return;
     }
-    const reader = new FileReader();
-    reader.onload = () => {
-      updateSubtaskField(id, "file", { name: file.name, dataUrl: reader.result });
+    updateSubtaskField(id, "fileError", "Mengupload...");
+    try {
+      const uploaded = await db.uploadAttachment(editing.id, id, file);
+      updateSubtaskField(id, "file", uploaded);
       updateSubtaskField(id, "fileError", null);
-    };
-    reader.onerror = () => updateSubtaskField(id, "fileError", "Gagal membaca file");
-    reader.readAsDataURL(file);
+    } catch (e) {
+      updateSubtaskField(id, "fileError", "Gagal upload file");
+    }
   }
 
   function removeSubtaskFile(id) {
     updateSubtaskField(id, "file", null);
   }
 
+  async function openAttachment(file) {
+    try {
+      // Signed URL dibuat dengan opsi download, jadi browser langsung mengunduh tanpa pindah halaman.
+      window.location.href = await db.attachmentUrl(file);
+    } catch (e) {
+      setSaveState("error");
+    }
+  }
+
   function addSubtask() {
     if (!newSubtask.trim()) return;
-    setEditing((prev) => ({ ...prev, subtasks: [...(prev.subtasks || []), { id: "s" + Date.now(), text: newSubtask.trim(), done: false }] }));
+    setEditing((prev) => ({ ...prev, subtasks: [...(prev.subtasks || []), { id: crypto.randomUUID(), text: newSubtask.trim(), done: false }] }));
     setNewSubtask("");
   }
 
@@ -285,18 +222,34 @@ export default function AgencyTracker() {
 
   function saveTask() {
     if (!editing.title.trim()) return;
-    if (editing.id) {
-      setTasks((prev) => prev.map((t) => (t.id === editing.id ? editing : t)));
+    const { isNew, ...task } = editing;
+    task.subtasks = task.subtasks.map(({ fileError, ...s }) => s);
+    const original = isNew ? null : tasks.find((t) => t.id === task.id);
+    if (isNew) {
+      task.position = tasks.reduce((max, t) => Math.max(max, t.position || 0), 0) + 1;
+      setTasks((prev) => [...prev, task]);
     } else {
-      setTasks((prev) => [...prev, { ...editing, id: "t" + Date.now() }]);
+      setTasks((prev) => prev.map((t) => (t.id === task.id ? task : t)));
     }
     setModalOpen(false);
+    persist(() => db.saveTask(task, original));
   }
 
   if (!loaded) {
     return (
       <div style={{ fontFamily: "Inter, system-ui, sans-serif", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: "#8A8782" }}>
         Memuat tracker...
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div style={{ fontFamily: "Inter, system-ui, sans-serif", minHeight: "100vh", display: "flex", flexDirection: "column", gap: "10px", alignItems: "center", justifyContent: "center", color: "#B4453F", fontSize: "13px" }}>
+        Gagal memuat data: {loadError}
+        <button onClick={loadBoard} style={{ fontSize: "13px", padding: "7px 14px", borderRadius: "6px", border: "1px solid #D8D6CC", background: "#fff", cursor: "pointer" }}>
+          Coba lagi
+        </button>
       </div>
     );
   }
@@ -340,6 +293,12 @@ export default function AgencyTracker() {
           >
             + Tugas Baru
           </button>
+          <button
+            onClick={() => supabase.auth.signOut()}
+            style={{ fontSize: "12px", padding: "7px 10px", borderRadius: "7px", border: "1px solid #D8D6CC", background: "#fff", color: "#5F5E5A", cursor: "pointer" }}
+          >
+            Keluar
+          </button>
         </div>
       </div>
 
@@ -372,7 +331,7 @@ export default function AgencyTracker() {
           >
             Semua Klien
           </div>
-          {CLIENTS.map((c) => (
+          {clients.map((c) => (
             <div
               key={c.id}
               onClick={() => setActiveClient(c.id)}
@@ -471,7 +430,7 @@ export default function AgencyTracker() {
           style={{ position: "fixed", inset: 0, background: "rgba(35,34,32,0.35)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50 }}
         >
           <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: "10px", padding: "20px", width: "320px", maxHeight: "88vh", overflowY: "auto", boxShadow: "0 8px 24px rgba(0,0,0,0.15)" }}>
-            <div style={{ fontSize: "14px", fontWeight: 700, marginBottom: "12px" }}>{editing.id ? "Edit Tugas" : "Tugas Baru"}</div>
+            <div style={{ fontSize: "14px", fontWeight: 700, marginBottom: "12px" }}>{editing.isNew ? "Tugas Baru" : "Edit Tugas"}</div>
             <input
               value={editing.title}
               onChange={(e) => setEditing({ ...editing, title: e.target.value })}
@@ -483,7 +442,7 @@ export default function AgencyTracker() {
               onChange={(e) => setEditing({ ...editing, client: e.target.value })}
               style={{ width: "100%", fontSize: "13px", padding: "8px 10px", borderRadius: "6px", border: "1px solid #D8D6CC", marginBottom: "8px" }}
             >
-              {CLIENTS.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
             <div style={{ display: "flex", gap: "8px", marginBottom: "8px" }}>
               <select
@@ -568,7 +527,7 @@ export default function AgencyTracker() {
                           </label>
                           {s.file && (
                             <span style={{ fontSize: "12px", color: "#5F5E5A", display: "flex", alignItems: "center", gap: "5px" }}>
-                              <a href={s.file.dataUrl} download={s.file.name} style={{ color: "#3D6FA6", textDecoration: "none" }}>{s.file.name}</a>
+                              <a href="#" onClick={(e) => { e.preventDefault(); openAttachment(s.file); }} style={{ color: "#3D6FA6", textDecoration: "none" }}>{s.file.name}</a>
                               <button onClick={() => removeSubtaskFile(s.id)} style={{ fontSize: "11px", color: "#B4B2A9", background: "none", border: "none", cursor: "pointer" }}>✕</button>
                             </span>
                           )}
@@ -596,7 +555,7 @@ export default function AgencyTracker() {
               </div>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between" }}>
-              {editing.id ? (
+              {!editing.isNew ? (
                 <button onClick={() => deleteTask(editing.id)} style={{ fontSize: "12px", color: "#B4453F", background: "none", border: "none", cursor: "pointer" }}>
                   Hapus
                 </button>
