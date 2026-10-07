@@ -496,7 +496,12 @@ export default function AgencyTracker() {
                         onClick={() => openEdit(t)}
                         style={{
                           background: "#fff", borderRadius: "8px", padding: "10px 11px",
-                          border: selectedIds.has(t.id) && isDone ? "1px solid #0E7C7B" : "1px solid #E7E5DC", borderLeftWidth: "3px", borderLeftColor: c.color,
+                          // Pakai properti border terpisah (bukan shorthand) supaya tidak bentrok dengan warna kiri saat kartu dipilih.
+                          borderStyle: "solid", borderWidth: "1px 1px 1px 3px",
+                          borderColor: (() => {
+                            const edge = selectedIds.has(t.id) && isDone ? "#0E7C7B" : "#E7E5DC";
+                            return `${edge} ${edge} ${edge} ${c.color}`;
+                          })(),
                           cursor: "grab", fontSize: "13px", opacity: dragId === t.id ? 0.4 : 1,
                         }}
                       >
