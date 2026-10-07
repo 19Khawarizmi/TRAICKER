@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import Icon from "@/components/icons";
 import { useTheme } from "@/components/theme";
+import IdleLogout, { markActivity, IDLE_TIMEOUT_MS, LOGOUT_REASON_KEY } from "@/components/IdleLogout";
 
 const ERROR_MESSAGES = {
   invalid_credentials: "Email atau password salah.",
@@ -32,11 +33,24 @@ export default function AuthGate({ children }) {
   const [password, setPassword] = useState("");
   const [status, setStatus] = useState("idle");
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const { resolved: resolvedTheme, setTheme } = useTheme();
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session));
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => setSession(s));
+    // Catatan: hitungan tidak aktif sengaja tidak direset di event SIGNED_IN, karena event itu juga
+    // muncul saat tab difokuskan lagi. Reset dilakukan di signIn() sebelum login dikirim.
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
+      if (!s) {
+        try {
+          if (sessionStorage.getItem(LOGOUT_REASON_KEY) === "idle") {
+            sessionStorage.removeItem(LOGOUT_REASON_KEY);
+            setNotice(`Kamu otomatis keluar karena tidak aktif selama ${Math.round(IDLE_TIMEOUT_MS / 60000)} menit. Silakan masuk lagi.`);
+          }
+        } catch {}
+      }
+      setSession(s);
+    });
     return () => sub.subscription.unsubscribe();
   }, []);
 
@@ -45,6 +59,9 @@ export default function AuthGate({ children }) {
     if (!email.trim() || !password) return;
     setStatus("signing-in");
     setError("");
+    setNotice("");
+    // Mulai hitungan tidak aktif dari nol supaya catatan sesi lama tidak langsung mengeluarkan user.
+    markActivity();
     const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
     setStatus("idle");
     if (error) {
@@ -56,7 +73,14 @@ export default function AuthGate({ children }) {
 
   if (session === undefined) return <Splash />;
 
-  if (session) return children;
+  if (session) {
+    return (
+      <>
+        {children}
+        <IdleLogout />
+      </>
+    );
+  }
 
   const busy = status === "signing-in";
 
@@ -79,6 +103,12 @@ export default function AuthGate({ children }) {
         <p className="auth-sub">Semua pekerjaan klien, di satu papan yang tenang.</p>
 
         <form onSubmit={signIn} className="auth-form">
+          {notice && (
+            <div className="notice" role="status" style={{ margin: 0 }}>
+              <Icon name="lock" size={14} />
+              <span>{notice}</span>
+            </div>
+          )}
           <label className="label">
             Email
             <input
