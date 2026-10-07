@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import * as db from "@/lib/trackerData";
+import { exportDoneTasks } from "@/lib/exportTasks";
 
 const COLUMNS = [
   { id: "todo", label: "Perlu Dikerjakan" },
@@ -32,7 +33,7 @@ function fmtDate(d) {
 }
 
 function isOverdue(d, column, todayStr) {
-  return column !== "done" && column !== "ongoing" && d < todayStr;
+  return column !== "done" && column !== "ongoing" && !!d && d < todayStr;
 }
 
 function daysUntil(d, todayStr) {
@@ -49,6 +50,9 @@ export default function AgencyTracker() {
   const [activeClient, setActiveClient] = useState("all");
   const [query, setQuery] = useState("");
   const [dragId, setDragId] = useState(null);
+  const [dropTarget, setDropTarget] = useState(null); // { column, beforeId } — beforeId null = taruh di paling bawah
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [exporting, setExporting] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [todayStr, setTodayStr] = useState("");
@@ -133,8 +137,10 @@ export default function AgencyTracker() {
         return a.due < b.due ? -1 : a.due > b.due ? 1 : 0;
       }
       if (sortBy === "client") return clientOf(a.client).name.localeCompare(clientOf(b.client).name);
-      return 0;
+      return (a.position || 0) - (b.position || 0);
     });
+  // Geser urutan di dalam kolom hanya masuk akal kalau tampilan memakai urutan manual.
+  const canReorder = sortBy === "default";
 
   const counts = clients.reduce((acc, c) => {
     acc[c.id] = tasks.filter((t) => t.client === c.id && t.column !== "done").length;
@@ -144,11 +150,60 @@ export default function AgencyTracker() {
   const dueSoon = tasks.filter((t) => t.column !== "done" && t.column !== "ongoing" && t.due && daysUntil(t.due, todayStr) >= 0 && daysUntil(t.due, todayStr) <= 1).sort((a, b) => (a.due < b.due ? -1 : 1));
   const overdueTasks = tasks.filter((t) => isOverdue(t.due, t.column, todayStr)).sort((a, b) => (a.due < b.due ? -1 : 1));
 
-  function moveTask(id, column) {
+  function endDrag() {
+    setDragId(null);
+    setDropTarget(null);
+  }
+
+  function updateDropTarget(column, beforeId) {
+    setDropTarget((prev) => (prev && prev.column === column && prev.beforeId === beforeId ? prev : { column, beforeId }));
+  }
+
+  // Pindahkan tugas yang sedang di-drag ke `column`, tepat sebelum `beforeId` (atau paling bawah),
+  // lalu nomori ulang urutan kolom tujuan. Hanya baris yang berubah yang ditulis ke Supabase.
+  function dropTask(column, beforeId) {
+    const id = dragId;
+    endDrag();
     const task = tasks.find((t) => t.id === id);
-    if (!task || task.column === column) return;
-    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, column } : t)));
-    persist(() => db.moveTask(id, column));
+    if (!task || beforeId === id) return;
+
+    const columnTasks = tasks.filter((t) => t.column === column && t.id !== id).sort((a, b) => (a.position || 0) - (b.position || 0));
+    let index = beforeId && canReorder ? columnTasks.findIndex((t) => t.id === beforeId) : -1;
+    if (index < 0) index = columnTasks.length;
+    columnTasks.splice(index, 0, task);
+
+    const updates = columnTasks
+      .map((t, i) => ({ id: t.id, column, position: i + 1 }))
+      .filter((u) => {
+        const old = tasks.find((t) => t.id === u.id);
+        return old.column !== u.column || old.position !== u.position;
+      });
+    if (updates.length === 0) return;
+
+    const byId = new Map(updates.map((u) => [u.id, u]));
+    setTasks((prev) => prev.map((t) => (byId.has(t.id) ? { ...t, column: byId.get(t.id).column, position: byId.get(t.id).position } : t)));
+    persist(() => db.reorderTasks(updates));
+  }
+
+  function toggleSelected(id) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function exportTasks(list) {
+    if (list.length === 0 || exporting) return;
+    setExporting(true);
+    try {
+      await exportDoneTasks(list, clientOf);
+    } catch (e) {
+      console.error(e);
+      setSaveState("error");
+    }
+    setExporting(false);
   }
 
   function deleteTask(id) {
@@ -354,36 +409,110 @@ export default function AgencyTracker() {
         <div style={{ flex: 1, display: "flex", gap: "14px", padding: "16px 18px", overflowX: "auto" }}>
           {COLUMNS.map((col) => {
             const colTasks = visibleTasks.filter((t) => t.column === col.id);
+            const isDone = col.id === "done";
+            const isDropColumn = dragId && dropTarget?.column === col.id;
+            const selectedDone = isDone ? colTasks.filter((t) => selectedIds.has(t.id)) : [];
+            const allSelected = isDone && colTasks.length > 0 && selectedDone.length === colTasks.length;
+            const dropLine = <div style={{ height: "3px", borderRadius: "2px", background: "#3D6FA6", margin: "-5px 0" }} />;
             return (
               <div
                 key={col.id}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={() => dragId && moveTask(dragId, col.id)}
-                style={{ minWidth: "220px", flex: "1 1 0", background: col.id === "ongoing" ? "#FBF3E4" : "#FAF9F6", border: col.id === "ongoing" ? "1px solid #E8D5AE" : "1px solid #E2E0D8", borderRadius: "9px", padding: "10px" }}
+                onDragOver={(e) => {
+                  if (!dragId) return;
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = "move";
+                  updateDropTarget(col.id, null);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  if (dragId) dropTask(col.id, dropTarget?.column === col.id ? dropTarget.beforeId : null);
+                }}
+                style={{
+                  minWidth: "220px", flex: "1 1 0", borderRadius: "9px", padding: "10px", transition: "background 0.12s, border-color 0.12s",
+                  background: isDropColumn ? "#EEF3F9" : col.id === "ongoing" ? "#FBF3E4" : "#FAF9F6",
+                  border: isDropColumn ? "1px dashed #3D6FA6" : col.id === "ongoing" ? "1px solid #E8D5AE" : "1px solid #E2E0D8",
+                }}
               >
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "2px 4px 10px" }}>
-                  <span style={{ fontSize: "12px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", color: col.id === "ongoing" ? "#8A5A1A" : "#5F5E5A" }}>
+                  <span style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", color: col.id === "ongoing" ? "#8A5A1A" : "#5F5E5A" }}>
+                    {isDone && colTasks.length > 0 && (
+                      <input
+                        type="checkbox"
+                        checked={allSelected}
+                        onChange={() => setSelectedIds(allSelected ? new Set() : new Set(colTasks.map((t) => t.id)))}
+                        title={allSelected ? "Batal pilih semua" : "Pilih semua tugas selesai"}
+                        style={{ cursor: "pointer", margin: 0 }}
+                      />
+                    )}
                     {col.id === "ongoing" && "🔁 "}{col.label}
                   </span>
                   <span style={{ fontSize: "11px", color: "#B4B2A9" }}>{colTasks.length}</span>
                 </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                  {colTasks.map((t) => {
+                {isDone && colTasks.length > 0 && (
+                  <div style={{ display: "flex", gap: "6px", marginBottom: "10px" }}>
+                    <button
+                      onClick={() => exportTasks(selectedDone.length > 0 ? selectedDone : colTasks)}
+                      disabled={exporting}
+                      title="Download Excel"
+                      style={{ flex: 1, fontSize: "11.5px", fontWeight: 600, padding: "6px 8px", borderRadius: "6px", border: "1px solid #0E7C7B", background: "#E4F3F1", color: "#0E7C7B", cursor: exporting ? "default" : "pointer", opacity: exporting ? 0.6 : 1 }}
+                    >
+                      {exporting ? "Menyiapkan…" : selectedDone.length > 0 ? `⬇ Export terpilih (${selectedDone.length})` : `⬇ Export semua (${colTasks.length})`}
+                    </button>
+                    {selectedDone.length > 0 && (
+                      <button
+                        onClick={() => setSelectedIds(new Set())}
+                        style={{ fontSize: "11.5px", padding: "6px 8px", borderRadius: "6px", border: "1px solid #D8D6CC", background: "#fff", color: "#5F5E5A", cursor: "pointer" }}
+                      >
+                        Batal
+                      </button>
+                    )}
+                  </div>
+                )}
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px", minHeight: "40px" }}>
+                  {colTasks.map((t, i) => {
                     const c = clientOf(t.client);
                     const overdue = isOverdue(t.due, t.column, todayStr);
+                    const nextId = colTasks[i + 1]?.id || null;
+                    const showLineBefore = isDropColumn && canReorder && dropTarget.beforeId === t.id && dragId !== t.id;
                     return (
+                      <React.Fragment key={t.id}>
+                      {showLineBefore && dropLine}
                       <div
-                        key={t.id}
                         draggable
-                        onDragStart={() => setDragId(t.id)}
+                        onDragStart={(e) => {
+                          e.dataTransfer.effectAllowed = "move";
+                          e.dataTransfer.setData("text/plain", t.id);
+                          setDragId(t.id);
+                        }}
+                        onDragEnd={endDrag}
+                        onDragOver={(e) => {
+                          if (!dragId) return;
+                          e.preventDefault();
+                          e.stopPropagation();
+                          e.dataTransfer.dropEffect = "move";
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          updateDropTarget(col.id, e.clientY < rect.top + rect.height / 2 ? t.id : nextId);
+                        }}
                         onClick={() => openEdit(t)}
                         style={{
                           background: "#fff", borderRadius: "8px", padding: "10px 11px",
-                          border: "1px solid #E7E5DC", borderLeftWidth: "3px", borderLeftColor: c.color,
-                          cursor: "grab", fontSize: "13px",
+                          border: selectedIds.has(t.id) && isDone ? "1px solid #0E7C7B" : "1px solid #E7E5DC", borderLeftWidth: "3px", borderLeftColor: c.color,
+                          cursor: "grab", fontSize: "13px", opacity: dragId === t.id ? 0.4 : 1,
                         }}
                       >
-                        <div style={{ fontWeight: 600, marginBottom: "6px", lineHeight: 1.35 }}>{t.title}</div>
+                        <div style={{ display: "flex", alignItems: "flex-start", gap: "7px", marginBottom: "6px" }}>
+                          {isDone && (
+                            <input
+                              type="checkbox"
+                              checked={selectedIds.has(t.id)}
+                              onChange={() => toggleSelected(t.id)}
+                              onClick={(e) => e.stopPropagation()}
+                              title="Pilih untuk export"
+                              style={{ cursor: "pointer", margin: "2px 0 0", flexShrink: 0 }}
+                            />
+                          )}
+                          <div style={{ fontWeight: 600, lineHeight: 1.35 }}>{t.title}</div>
+                        </div>
                         {t.subtasks && t.subtasks.length > 0 && (() => {
                           const doneCt = t.subtasks.filter((s) => s.done).length;
                           const total = t.subtasks.length;
@@ -406,15 +535,19 @@ export default function AgencyTracker() {
                           <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                             <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: PRIORITIES[t.priority] }} title={t.priority} />
                             <span style={{ fontSize: "11px", color: overdue ? "#B4453F" : "#8A8782", fontWeight: overdue ? 700 : 400 }}>
-                              {t.column === "ongoing" ? "" : fmtDate(t.due)}
+                              {t.column === "ongoing" || !t.due ? "" : fmtDate(t.due)}
                             </span>
                           </span>
                         </div>
                       </div>
+                      </React.Fragment>
                     );
                   })}
+                  {isDropColumn && (dropTarget.beforeId === null || !canReorder) && colTasks.length > 0 && dropLine}
                   {colTasks.length === 0 && (
-                    <div style={{ fontSize: "12px", color: "#B4B2A9", padding: "10px 4px", textAlign: "center" }}>Kosong</div>
+                    <div style={{ fontSize: "12px", color: isDropColumn ? "#3D6FA6" : "#B4B2A9", padding: "10px 4px", textAlign: "center" }}>
+                      {isDropColumn ? "Lepas di sini" : "Kosong"}
+                    </div>
                   )}
                 </div>
               </div>
@@ -554,6 +687,20 @@ export default function AgencyTracker() {
                 </button>
               </div>
             </div>
+            {(() => {
+              // Export memakai versi yang sudah tersimpan, jadi hanya muncul untuk tugas yang statusnya sudah Selesai.
+              const saved = !editing.isNew && tasks.find((t) => t.id === editing.id);
+              if (!saved || saved.column !== "done") return null;
+              return (
+                <button
+                  onClick={() => exportTasks([saved])}
+                  disabled={exporting}
+                  style={{ width: "100%", fontSize: "12.5px", fontWeight: 600, padding: "7px 10px", borderRadius: "6px", border: "1px solid #0E7C7B", background: "#E4F3F1", color: "#0E7C7B", cursor: "pointer", marginBottom: "10px", opacity: exporting ? 0.6 : 1 }}
+                >
+                  {exporting ? "Menyiapkan…" : "⬇ Export tugas ini ke Excel"}
+                </button>
+              );
+            })()}
             <div style={{ display: "flex", justifyContent: "space-between" }}>
               {!editing.isNew ? (
                 <button onClick={() => deleteTask(editing.id)} style={{ fontSize: "12px", color: "#B4453F", background: "none", border: "none", cursor: "pointer" }}>
