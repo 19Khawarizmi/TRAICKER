@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
+import Icon from "@/components/icons";
+import { useTheme } from "@/components/theme";
 
 const ERROR_MESSAGES = {
   invalid_credentials: "Email atau password salah.",
@@ -14,7 +16,14 @@ function friendlyError(code, fallback) {
   return ERROR_MESSAGES[code] || fallback || "Login gagal. Coba lagi.";
 }
 
-const inputStyle = { width: "100%", boxSizing: "border-box", fontSize: "13px", padding: "8px 10px", borderRadius: "6px", border: "1px solid #D8D6CC", marginBottom: "8px" };
+export function Splash({ label = "Memuat…" }) {
+  return (
+    <div className="splash">
+      <div className="brand-mark auth-mark" style={{ margin: 0 }}>t</div>
+      {label}
+    </div>
+  );
+}
 
 // Login email + password. Akun tidak dibuat dari sini; anggota tim ditambahkan lewat dashboard Supabase.
 export default function AuthGate({ children }) {
@@ -23,6 +32,7 @@ export default function AuthGate({ children }) {
   const [password, setPassword] = useState("");
   const [status, setStatus] = useState("idle");
   const [error, setError] = useState("");
+  const { resolved: resolvedTheme, setTheme } = useTheme();
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session));
@@ -44,51 +54,68 @@ export default function AuthGate({ children }) {
     }
   }
 
-  if (session === undefined) {
-    return (
-      <div style={{ fontFamily: "Inter, system-ui, sans-serif", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: "#8A8782" }}>
-        Memuat...
-      </div>
-    );
-  }
+  if (session === undefined) return <Splash />;
 
   if (session) return children;
 
+  const busy = status === "signing-in";
+
   return (
-    <div style={{ fontFamily: "Inter, system-ui, sans-serif", background: "#F5F4F0", color: "#232220", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}>
-      <form onSubmit={signIn} style={{ background: "#fff", borderRadius: "10px", padding: "24px", width: "100%", maxWidth: "320px", boxShadow: "0 8px 24px rgba(0,0,0,0.08)" }}>
-        <div style={{ fontFamily: "Georgia, 'Iowan Old Style', serif", fontSize: "20px", fontWeight: 700, marginBottom: "4px" }}>
-          Task Tracker — Up+Above
-        </div>
-        <div style={{ fontSize: "12.5px", color: "#8A8782", marginBottom: "16px" }}>
-          Masuk dengan email dan password tim.
-        </div>
-        <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="nama@upabove.id"
-          autoComplete="username"
-          autoFocus
-          style={inputStyle}
-        />
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="Password"
-          autoComplete="current-password"
-          style={inputStyle}
-        />
-        {error && <div style={{ fontSize: "12px", color: "#B4453F", marginBottom: "8px" }}>{error}</div>}
-        <button
-          type="submit"
-          disabled={status === "signing-in"}
-          style={{ width: "100%", fontSize: "13px", fontWeight: 600, padding: "8px 14px", borderRadius: "6px", border: "none", background: "#232220", color: "#fff", cursor: "pointer", opacity: status === "signing-in" ? 0.6 : 1 }}
-        >
-          {status === "signing-in" ? "Masuk..." : "Masuk"}
-        </button>
-      </form>
-    </div>
+    <main className="auth">
+      <button
+        className="btn btn-ghost btn-icon"
+        onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
+        aria-label={resolvedTheme === "dark" ? "Ganti ke mode terang" : "Ganti ke mode gelap"}
+        title={resolvedTheme === "dark" ? "Mode terang" : "Mode gelap"}
+        style={{ position: "fixed", top: 16, right: 16 }}
+      >
+        <Icon name={resolvedTheme === "dark" ? "sun" : "moon"} />
+      </button>
+      <div className="auth-card">
+        <div className="brand-mark auth-mark">t</div>
+        <h1 className="auth-title">
+          Task <em>Tracker</em>
+        </h1>
+        <p className="auth-sub">Semua pekerjaan klien, di satu papan yang tenang.</p>
+
+        <form onSubmit={signIn} className="auth-form">
+          <label className="label">
+            Email
+            <input
+              className="field"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="nama@email.com"
+              autoComplete="username"
+              autoFocus
+            />
+          </label>
+          <label className="label">
+            Password
+            <input
+              className="field"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              autoComplete="current-password"
+            />
+          </label>
+          {error && (
+            <div className="auth-error" role="alert">
+              <Icon name="alert" size={14} />
+              <span>{error}</span>
+            </div>
+          )}
+          <button type="submit" className="btn btn-primary" disabled={busy || !email.trim() || !password}>
+            {busy ? <span className="spinner" style={{ borderTopColor: "var(--on-ink)" }} /> : null}
+            {busy ? "Masuk…" : "Masuk"}
+          </button>
+        </form>
+
+        <p className="auth-foot">Belum punya akun? Minta admin untuk menambahkanmu.</p>
+      </div>
+    </main>
   );
 }

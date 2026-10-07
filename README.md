@@ -1,6 +1,6 @@
 # Traicker
 
-Task tracker internal Up+Above, dibangun dengan Next.js (App Router). Data tersimpan di Supabase (Postgres + Storage), login pakai email + password.
+Task tracker internal, dibangun dengan Next.js (App Router). Data tersimpan di Supabase (Postgres + Storage), login pakai email + password.
 
 ## Menjalankan secara lokal
 
