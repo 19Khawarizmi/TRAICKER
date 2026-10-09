@@ -7,6 +7,12 @@ import { exportDoneTasks } from "@/lib/exportTasks";
 import Icon from "@/components/icons";
 import { Splash } from "@/components/AuthGate";
 import { useTheme } from "@/components/theme";
+import TeamDialog from "@/components/TeamDialog";
+import ChangePasswordDialog from "@/components/ChangePasswordDialog";
+import NotificationBell from "@/components/NotificationBell";
+import TaskFeed from "@/components/TaskFeed";
+import CalendarView from "@/components/CalendarView";
+import TimelineView from "@/components/TimelineView";
 
 const COLUMNS = [
   { id: "todo", label: "Perlu Dikerjakan", color: "var(--s-todo)", dot: "" },
@@ -135,6 +141,8 @@ export default function AgencyTracker() {
   const [newClient, setNewClient] = useState({ name: "", short: "", color: CLIENT_COLORS[0] });
   const [clientError, setClientError] = useState("");
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [teamOpen, setTeamOpen] = useState(false);
+  const [passwordOpen, setPasswordOpen] = useState(false);
   const [attentionOpen, setAttentionOpen] = useState(false);
   const { theme, resolved: resolvedTheme, setTheme } = useTheme();
   const [modalOpen, setModalOpen] = useState(false);
@@ -144,6 +152,7 @@ export default function AgencyTracker() {
   const [saveState, setSaveState] = useState("idle");
   const [saveError, setSaveError] = useState("");
   const [sortBy, setSortBy] = useState("default");
+  const [view, setView] = useState("board"); // board | calendar | timeline
   const [newSubtask, setNewSubtask] = useState("");
   const [expandedSubtask, setExpandedSubtask] = useState(null);
 
@@ -164,6 +173,48 @@ export default function AgencyTracker() {
   useEffect(() => {
     setTodayStr(getTodayStr());
     loadBoard();
+    try {
+      const saved = localStorage.getItem("traicker:view");
+      if (saved === "calendar" || saved === "timeline") setView(saved);
+    } catch {}
+  }, []);
+
+  function changeView(next) {
+    setView(next);
+    try {
+      localStorage.setItem("traicker:view", next);
+    } catch {}
+  }
+
+  // Realtime: perubahan dari anggota lain (tugas, subtask, klien, anggota) langsung memuat ulang papan.
+  // Ditunda sebentar supaya banyak perubahan beruntun cukup dimuat sekali, dan tidak memotong drag yang sedang berjalan.
+  const dragIdRef = useRef(null);
+  dragIdRef.current = dragId;
+  useEffect(() => {
+    let timer;
+    const run = () => {
+      if (dragIdRef.current) {
+        timer = setTimeout(run, 500);
+        return;
+      }
+      loadBoard();
+    };
+    const schedule = () => {
+      clearTimeout(timer);
+      timer = setTimeout(run, 400);
+    };
+    const channel = supabase
+      .channel("board-sync")
+      .on("postgres_changes", { event: "*", schema: "public", table: "tasks" }, schedule)
+      .on("postgres_changes", { event: "*", schema: "public", table: "subtasks" }, schedule)
+      .on("postgres_changes", { event: "*", schema: "public", table: "clients" }, schedule)
+      .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, schedule)
+      .subscribe();
+    return () => {
+      clearTimeout(timer);
+      supabase.removeChannel(channel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Update UI dulu (optimistic), lalu tulis ke Supabase. Kalau gagal, muat ulang dari server.
@@ -378,7 +429,7 @@ export default function AgencyTracker() {
   function openNew() {
     // ID dibuat di client supaya lampiran bisa langsung di-upload sebelum tugas disimpan.
     // Member yang membuat tugas otomatis jadi assignee-nya; admin bebas memilih.
-    setEditing({ id: crypto.randomUUID(), isNew: true, title: "", client: activeClients[0]?.id, assignee: isAdmin ? null : currentUserId, createdBy: currentUserId, priority: "Sedang", due: todayStr, column: "todo", subtasks: [] });
+    setEditing({ id: crypto.randomUUID(), isNew: true, title: "", client: activeClients[0]?.id, assignee: isAdmin ? null : currentUserId, createdBy: currentUserId, priority: "Sedang", due: todayStr, start: "", column: "todo", subtasks: [] });
     setNewSubtask("");
     setExpandedSubtask(null);
     setModalOpen(true);
@@ -389,6 +440,20 @@ export default function AgencyTracker() {
     setNewSubtask("");
     setExpandedSubtask(null);
     setModalOpen(true);
+  }
+
+  // Dari notifikasi: buka detail tugas berdasarkan id (kalau masih ada).
+  function openTaskById(id) {
+    const task = tasks.find((t) => t.id === id);
+    if (task) openEdit(task);
+  }
+
+  // Dari kalender: geser tugas ke tanggal lain = ganti deadline.
+  function moveDue(task, due) {
+    if (!canEditTask(task)) return;
+    const start = task.start && task.start > due ? due : task.start;
+    setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, due, start } : t)));
+    persist(() => db.updateTaskDates(task.id, { due, start }));
   }
 
   function toggleSubtask(id) {
@@ -470,6 +535,7 @@ export default function AgencyTracker() {
   const modalCanEdit = !!editing && (editing.isNew || (!!savedEditing && canEditTask(savedEditing)));
   const subtaskWorkable = (s) => modalCanEdit || (!!currentUserId && s.assignee === currentUserId);
   const modalHasOwnSubtasks = !!editing && !modalCanEdit && (editing.subtasks || []).some(subtaskWorkable);
+  const datesInvalid = !!editing && editing.column !== "ongoing" && !!editing.start && !!editing.due && editing.start > editing.due;
 
   // Esc menutup panel / dialog / popover yang sedang terbuka.
   useEffect(() => {
@@ -477,12 +543,14 @@ export default function AgencyTracker() {
       if (e.key !== "Escape") return;
       if (attentionOpen) setAttentionOpen(false);
       else if (userMenuOpen) setUserMenuOpen(false);
+      else if (passwordOpen) setPasswordOpen(false);
+      else if (teamOpen) setTeamOpen(false);
       else if (clientModalOpen) setClientModalOpen(false);
       else if (modalOpen) setModalOpen(false);
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [attentionOpen, userMenuOpen, clientModalOpen, modalOpen]);
+  }, [attentionOpen, userMenuOpen, passwordOpen, teamOpen, clientModalOpen, modalOpen]);
 
   if (!loaded) return <Splash label="Menyiapkan papan…" />;
 
@@ -537,6 +605,11 @@ export default function AgencyTracker() {
 
         {isAdmin && (
           <div className="sidebar-foot">
+            <button className="nav-item" onClick={() => setTeamOpen(true)}>
+              <Icon name="users" size={15} />
+              <span className="nav-text">Anggota tim</span>
+              <span className="nav-count">{profiles.length}</span>
+            </button>
             <button className="nav-item" onClick={openClientModal}>
               <Icon name="settings" size={15} />
               <span className="nav-text">Kelola klien</span>
@@ -564,6 +637,8 @@ export default function AgencyTracker() {
             <Icon name="plus" size={14} />
             Tugas baru
           </button>
+
+          <NotificationBell userId={currentUserId} profileOf={profileOf} Avatar={Avatar} onOpenTask={openTaskById} />
 
           <button
             className="btn btn-ghost btn-icon"
@@ -609,6 +684,10 @@ export default function AgencyTracker() {
                       </button>
                     ))}
                   </div>
+                  <button className="popover-item" onClick={() => { setUserMenuOpen(false); setPasswordOpen(true); }}>
+                    <Icon name="lock" size={15} />
+                    <span className="grow">Ganti password</span>
+                  </button>
                   <button className="popover-item" onClick={() => { setUserMenuOpen(false); supabase.auth.signOut(); }} style={{ color: "var(--danger)" }}>
                     <Icon name="logout" size={15} />
                     <span className="grow">Keluar</span>
@@ -669,6 +748,18 @@ export default function AgencyTracker() {
           </div>
 
           <div className="toolbar">
+            <div className="segmented view-switch" role="tablist" aria-label="Tampilan">
+              {[
+                ["board", "Papan", "columns"],
+                ["calendar", "Kalender", "calendar"],
+                ["timeline", "Timeline", "timeline"],
+              ].map(([id, label, icon]) => (
+                <button key={id} role="tab" aria-selected={view === id} className={view === id ? "is-active" : ""} onClick={() => changeView(id)}>
+                  <Icon name={icon} size={13} />
+                  {label}
+                </button>
+              ))}
+            </div>
             <select
               className={`select ${assigneeFilter !== "all" ? "is-active" : ""}`}
               value={assigneeFilter}
@@ -680,15 +771,32 @@ export default function AgencyTracker() {
               <option value="none">Belum ditugaskan</option>
               {profileOptions}
             </select>
+            {view === "board" && (
             <select className={`select ${sortBy !== "default" ? "is-active" : ""}`} value={sortBy} onChange={(e) => setSortBy(e.target.value)} aria-label="Urutan">
               <option value="default">Urutan manual</option>
               <option value="due">Deadline terdekat</option>
               <option value="client">Nama klien</option>
             </select>
+            )}
           </div>
         </section>
 
+        {view === "calendar" && (
+          <CalendarView tasks={visibleTasks} todayStr={todayStr} clientOf={clientOf} isOverdue={isOverdue} canEditTask={canEditTask} onOpen={openEdit} onMoveDue={moveDue} />
+        )}
+        {view === "timeline" && (
+          <TimelineView
+            tasks={visibleTasks}
+            todayStr={todayStr}
+            clientOf={clientOf}
+            isOverdue={isOverdue}
+            onOpen={openEdit}
+            columns={Object.fromEntries(COLUMNS.map((c) => [c.id, c.label]))}
+          />
+        )}
+
         {/* ---------- Board ---------- */}
+        {view === "board" && (
         <div className="board">
           {COLUMNS.map((col) => {
             const colTasks = visibleTasks.filter((t) => t.column === col.id);
@@ -834,7 +942,35 @@ export default function AgencyTracker() {
             );
           })}
         </div>
+        )}
       </div>
+
+      {passwordOpen && me && <ChangePasswordDialog email={me.email} onClose={() => setPasswordOpen(false)} />}
+
+      {/* ---------- Anggota tim (admin) ---------- */}
+      {teamOpen && isAdmin && (
+        <TeamDialog
+          profiles={profiles}
+          currentUserId={currentUserId}
+          Avatar={Avatar}
+          onClose={() => setTeamOpen(false)}
+          onCreated={(p) => setProfiles((prev) => [...prev.filter((x) => x.id !== p.id), p].sort((a, b) => a.name.localeCompare(b.name)))}
+          onUpdated={(p) => setProfiles((prev) => prev.map((x) => (x.id === p.id ? { ...x, ...p } : x)).sort((a, b) => a.name.localeCompare(b.name)))}
+          onRemoved={(id) => {
+            // Database mengosongkan penugasan orang ini (on delete set null); samakan tampilan tanpa reload.
+            setProfiles((prev) => prev.filter((x) => x.id !== id));
+            setTasks((prev) =>
+              prev.map((t) => ({
+                ...t,
+                assignee: t.assignee === id ? null : t.assignee,
+                createdBy: t.createdBy === id ? null : t.createdBy,
+                subtasks: (t.subtasks || []).map((s) => (s.assignee === id ? { ...s, assignee: null } : s)),
+              }))
+            );
+            if (assigneeFilter === id) setAssigneeFilter("all");
+          }}
+        />
+      )}
 
       {/* ---------- Kelola klien (admin) ---------- */}
       {clientModalOpen && isAdmin && (
@@ -1040,6 +1176,15 @@ export default function AgencyTracker() {
                   </select>
                 </div>
 
+                <div className="prop-label"><Icon name="calendar" size={14} />Mulai</div>
+                <div className="prop-value">
+                  {editing.column === "ongoing" ? (
+                    <span className="text-muted" style={{ fontSize: 12.5 }}>—</span>
+                  ) : (
+                    <input type="date" className="field mono" value={editing.start || ""} max={editing.due || undefined} onChange={(e) => setEditing({ ...editing, start: e.target.value })} disabled={!modalCanEdit} />
+                  )}
+                </div>
+
                 <div className="prop-label"><Icon name="calendar" size={14} />Deadline</div>
                 <div className="prop-value">
                   {editing.column === "ongoing" ? (
@@ -1048,6 +1193,7 @@ export default function AgencyTracker() {
                     <input type="date" className="field mono" value={editing.due} onChange={(e) => setEditing({ ...editing, due: e.target.value })} disabled={!modalCanEdit} />
                   )}
                 </div>
+                {datesInvalid && <div className="prop-hint" style={{ color: "var(--danger)" }}>Tanggal mulai harus sebelum atau sama dengan deadline.</div>}
               </div>
 
               {/* Subtask */}
@@ -1149,6 +1295,19 @@ export default function AgencyTracker() {
                   </>
                 );
               })()}
+
+              {!editing.isNew && (
+                <TaskFeed
+                  key={editing.id}
+                  taskId={editing.id}
+                  currentUserId={currentUserId}
+                  isAdmin={isAdmin}
+                  profileOf={profileOf}
+                  clientOf={(id) => clients.find((c) => c.id === id)}
+                  columnLabel={(id) => COLUMN_BY_ID[id]?.label || id}
+                  Avatar={Avatar}
+                />
+              )}
             </div>
 
             <div className="drawer-foot">
@@ -1169,7 +1328,7 @@ export default function AgencyTracker() {
                 {modalCanEdit || modalHasOwnSubtasks ? "Batal" : "Tutup"}
               </button>
               {(modalCanEdit || modalHasOwnSubtasks) && (
-                <button className="btn btn-primary" onClick={saveTask} disabled={!editing.title.trim()}>
+                <button className="btn btn-primary" onClick={saveTask} disabled={!editing.title.trim() || datesInvalid}>
                   Simpan
                 </button>
               )}
