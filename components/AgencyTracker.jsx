@@ -144,6 +144,7 @@ export default function AgencyTracker() {
   const [teamOpen, setTeamOpen] = useState(false);
   const [passwordOpen, setPasswordOpen] = useState(false);
   const [attentionOpen, setAttentionOpen] = useState(false);
+  const [navOpen, setNavOpen] = useState(false); // sidebar geser di tablet & HP
   const { theme, resolved: resolvedTheme, setTheme } = useTheme();
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -442,6 +443,15 @@ export default function AgencyTracker() {
     setModalOpen(true);
   }
 
+  // Dari pilihan "Pindah ke" di kartu (layar sentuh): taruh tugas di paling bawah kolom tujuan.
+  function moveToColumn(task, column) {
+    if (!canEditTask(task) || task.column === column) return;
+    const last = tasks.filter((t) => t.column === column).reduce((max, t) => Math.max(max, t.position || 0), 0);
+    const position = last + 1;
+    setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, column, position } : t)));
+    persist(() => db.moveTask(task.id, column, position));
+  }
+
   // Dari notifikasi: buka detail tugas berdasarkan id (kalau masih ada).
   function openTaskById(id) {
     const task = tasks.find((t) => t.id === id);
@@ -543,6 +553,7 @@ export default function AgencyTracker() {
       if (e.key !== "Escape") return;
       if (attentionOpen) setAttentionOpen(false);
       else if (userMenuOpen) setUserMenuOpen(false);
+      else if (navOpen) setNavOpen(false);
       else if (passwordOpen) setPasswordOpen(false);
       else if (teamOpen) setTeamOpen(false);
       else if (clientModalOpen) setClientModalOpen(false);
@@ -550,7 +561,7 @@ export default function AgencyTracker() {
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [attentionOpen, userMenuOpen, passwordOpen, teamOpen, clientModalOpen, modalOpen]);
+  }, [attentionOpen, userMenuOpen, navOpen, passwordOpen, teamOpen, clientModalOpen, modalOpen]);
 
   if (!loaded) return <Splash label="Menyiapkan papan…" />;
 
@@ -580,22 +591,26 @@ export default function AgencyTracker() {
 
   return (
     <div className="app">
-      {/* ---------- Sidebar ---------- */}
-      <aside className="sidebar">
+      {/* ---------- Sidebar (di tablet & HP jadi menu geser) ---------- */}
+      {navOpen && <div className="nav-scrim" onClick={() => setNavOpen(false)} />}
+      <aside className={`sidebar ${navOpen ? "is-open" : ""}`} aria-label="Navigasi">
         <div className="brand">
           <div className="brand-mark" aria-hidden="true">Ai</div>
           <div className="brand-name">Tr<em>ai</em>cker</div>
+          <button className="btn btn-ghost btn-icon nav-close" onClick={() => setNavOpen(false)} aria-label="Tutup menu">
+            <Icon name="x" />
+          </button>
         </div>
 
         <nav>
-          <button className={`nav-item ${activeClient === "all" ? "is-active" : ""}`} onClick={() => setActiveClient("all")}>
+          <button className={`nav-item ${activeClient === "all" ? "is-active" : ""}`} onClick={() => { setActiveClient("all"); setNavOpen(false); }}>
             <Icon name="folder" size={15} />
             <span className="nav-text">Semua klien</span>
             <span className="nav-count">{boardTasks.filter((t) => t.column !== "done").length}</span>
           </button>
           <div className="nav-label">Klien</div>
           {activeClients.map((c) => (
-            <button key={c.id} className={`nav-item ${activeClient === c.id ? "is-active" : ""}`} onClick={() => setActiveClient(c.id)} title={c.name}>
+            <button key={c.id} className={`nav-item ${activeClient === c.id ? "is-active" : ""}`} onClick={() => { setActiveClient(c.id); setNavOpen(false); }} title={c.name}>
               <span className="dot" style={{ background: c.color }} />
               <span className="nav-text">{c.short}</span>
               <span className="nav-count">{counts[c.id] || ""}</span>
@@ -605,12 +620,12 @@ export default function AgencyTracker() {
 
         {isAdmin && (
           <div className="sidebar-foot">
-            <button className="nav-item" onClick={() => setTeamOpen(true)}>
+            <button className="nav-item" onClick={() => { setTeamOpen(true); setNavOpen(false); }}>
               <Icon name="users" size={15} />
               <span className="nav-text">Anggota tim</span>
               <span className="nav-count">{profiles.length}</span>
             </button>
-            <button className="nav-item" onClick={openClientModal}>
+            <button className="nav-item" onClick={() => { openClientModal(); setNavOpen(false); }}>
               <Icon name="settings" size={15} />
               <span className="nav-text">Kelola klien</span>
               {archivedClientIds.size > 0 && <span className="nav-count">{archivedClientIds.size} arsip</span>}
@@ -622,6 +637,13 @@ export default function AgencyTracker() {
       <div className="main">
         {/* ---------- Topbar ---------- */}
         <header className="topbar">
+          <button className="btn btn-ghost btn-icon nav-toggle" onClick={() => setNavOpen(true)} aria-label="Buka menu klien">
+            <Icon name="menu" />
+          </button>
+          <div className="topbar-brand" aria-hidden="true">
+            <div className="brand-mark">Ai</div>
+            <span className="brand-name">Tr<em>ai</em>cker</span>
+          </div>
           <label className="search">
             <Icon name="search" size={14} />
             <input className="field" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Cari tugas…" aria-label="Cari tugas" />
@@ -633,9 +655,10 @@ export default function AgencyTracker() {
               {saveLabel}
             </span>
           )}
-          <button className="btn btn-primary" onClick={openNew}>
+          {/* Di HP tombol ini menjadi tombol bulat melayang di kanan bawah (lihat .btn-new di CSS). */}
+          <button className="btn btn-primary btn-new" onClick={openNew} aria-label="Tugas baru">
             <Icon name="plus" size={14} />
-            Tugas baru
+            <span className="btn-new-label">Tugas baru</span>
           </button>
 
           <NotificationBell userId={currentUserId} profileOf={profileOf} Avatar={Avatar} onOpenTask={openTaskById} />
@@ -891,6 +914,17 @@ export default function AgencyTracker() {
                               <span className="dot" style={{ background: c.color, width: 7, height: 7 }} />
                               <span>{c.short}</span>
                             </span>
+                            {/* Layar sentuh tidak mendukung tarik-geser kartu dengan baik: pindah kolom lewat pilihan ini.
+                                Disembunyikan di perangkat ber-mouse (lihat .card-move di CSS). */}
+                            {draggable && (
+                              <label className="card-move" onClick={(e) => e.stopPropagation()} title="Pindah ke kolom lain">
+                                <Icon name="columns" size={12} />
+                                <span className="sr-only">Pindah ke</span>
+                                <select value={t.column} onChange={(e) => moveToColumn(t, e.target.value)} aria-label={`Pindahkan "${t.title}" ke kolom`}>
+                                  {COLUMNS.map((cc) => <option key={cc.id} value={cc.id}>{cc.label}</option>)}
+                                </select>
+                              </label>
+                            )}
                             {isDone && (
                               <input
                                 type="checkbox"

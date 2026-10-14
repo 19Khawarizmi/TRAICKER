@@ -51,6 +51,14 @@ export default function NotificationBell({ userId, profileOf, Avatar, onOpenTask
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
 
+  // Esc menutup panel notifikasi.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e) => { if (e.key === "Escape") setOpen(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
+
   const unread = items.filter((n) => !n.read).length;
   const shown = filter === "unread" ? items.filter((n) => !n.read) : items;
 

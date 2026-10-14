@@ -55,7 +55,9 @@ export default function TimelineView({ tasks, todayStr, clientOf, isOverdue, onO
 
   // Gulir otomatis ke sekitar hari ini saat pertama dibuka.
   useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollLeft = Math.max(0, (todayIdx - 5) * DAY_W);
+    // Hari ini diletakkan sekitar sepertiga dari kiri area yang terlihat, di layar lebar maupun HP.
+    const el = scrollRef.current;
+    if (el) el.scrollLeft = Math.max(0, todayIdx * DAY_W - el.clientWidth / 3);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

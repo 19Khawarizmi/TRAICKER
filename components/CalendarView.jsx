@@ -101,6 +101,43 @@ export default function CalendarView({ tasks, todayStr, clientOf, isOverdue, can
         })}
       </div>
 
+      {/* Agenda: daftar per tanggal untuk bulan yang sedang dilihat. Hanya tampil di HP (grid terlalu kecil untuk dibaca). */}
+      <div className="calendar-agenda">
+        {(() => {
+          const prefix = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}-`;
+          const days = Object.keys(byDay).filter((k) => k.startsWith(prefix)).sort();
+          if (days.length === 0) return <p className="text-muted" style={{ margin: 0 }}>Tidak ada deadline di bulan ini.</p>;
+          return days.map((key) => {
+            const date = new Date(key + "T00:00:00");
+            return (
+              <div key={key} className={`agenda-day ${key === todayStr ? "is-today" : ""}`}>
+                <div className="agenda-date">
+                  <span className="mono">{date.getDate()}</span>
+                  <span>{date.toLocaleDateString("id-ID", { weekday: "short" })}</span>
+                </div>
+                <div className="agenda-items">
+                  {byDay[key].map((t) => {
+                    const c = clientOf(t.client);
+                    return (
+                      <button
+                        key={t.id}
+                        className={`calendar-chip ${t.column === "done" ? "is-done" : ""} ${isOverdue(t.due, t.column, todayStr) ? "is-late" : ""}`}
+                        style={{ "--chip": c.color }}
+                        onClick={() => onOpen(t)}
+                      >
+                        <span className="dot" style={{ background: c.color, width: 7, height: 7 }} />
+                        <span className="agenda-text">{t.title}</span>
+                        <span className="agenda-client">{c.short}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          });
+        })()}
+      </div>
+
       {undated.length > 0 && (
         <div className="calendar-undated">
           <span className="text-muted">Tanpa deadline / ongoing:</span>
