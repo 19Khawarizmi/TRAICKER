@@ -2,10 +2,11 @@
 
 import React, { useMemo, useState } from "react";
 import Icon from "@/components/icons";
+import Select from "@/components/Select";
 import * as cdb from "@/lib/contentData";
 import { exportReport } from "@/lib/exportReport";
 import {
-  aggregate, periodRecap, periodPosts, periodRange, periodLabel, shiftPeriod, followersAt, monthKey, weekKey, addMonths,
+  aggregate, periodRecap, periodPosts, periodRange, periodLabel, periodOf, shiftPeriod, followersAt, monthKey, weekKey, addMonths,
   change, engagementOf, erOf, hasMetrics, INSIGHT_FIELDS, insightOf, insightEr, fmtInt, fmtPct, fmtDelta,
 } from "@/lib/contentMetrics";
 
@@ -160,6 +161,10 @@ export default function ReportView({
 
   // Konten tayang di periode ini (angka per konten) — untuk report mingguan dan "konten terbaik".
   const curPosts = periodPosts(clientPosts, kind, period);
+  // Kalau periode ini kosong: minggu/bulan terakhir (sebelum periode ini, atau sesudahnya) yang punya konten tayang.
+  const publishedDates = clientPosts.filter((p) => p.status === "published" && p.date).map((p) => p.date).sort();
+  const nearestDate = curPosts.length ? null : [...publishedDates].reverse().find((d) => d < periodStart) || publishedDates.find((d) => d > periodEnd);
+  const nearestPeriod = nearestDate ? periodOf(kind, nearestDate) : null;
   const missing = curPosts.filter((p) => !hasMetrics(p));
   const ranked = curPosts.filter((p) => p.metrics?.reach > 0).sort((a, b) => erOf(b) - erOf(a));
   const top = ranked.slice(0, 3);
@@ -263,9 +268,14 @@ export default function ReportView({
             ))}
           </div>
           {activeClient === "all" && (
-            <select className="select" value={clientId} onChange={(e) => setPickedClient(e.target.value)} aria-label="Klien untuk report">
-              {activeClients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+            <Select
+              variant="toolbar"
+              value={clientId}
+              onChange={setPickedClient}
+              ariaLabel="Klien untuk report"
+              searchPlaceholder="Cari klien…"
+              options={activeClients.map((c) => ({ value: c.id, label: c.name, leading: <span className="sel-swatch" style={{ "--swatch": c.color }} /> }))}
+            />
           )}
           <div className="rp-month">
             <button className="btn btn-secondary btn-sm btn-icon" onClick={() => setPeriod(shiftPeriod(kind, period, -1))} aria-label={`${K.unit} sebelumnya`}><Icon name="chevronLeft" size={14} /></button>
@@ -281,7 +291,7 @@ export default function ReportView({
             </button>
           )}
           {kind === "weekly" && (
-            <button className="btn btn-primary btn-sm" onClick={runExport} disabled={exporting || curPosts.length === 0}>
+            <button className="btn btn-primary btn-sm" onClick={runExport} disabled={exporting || curPosts.length === 0} title={curPosts.length === 0 ? "Belum ada konten tayang di minggu ini" : "Export Excel report minggu ini"}>
               {exporting ? <span className="spinner" style={{ borderTopColor: "var(--on-ink)" }} /> : <Icon name="download" size={13} />}
               Export mingguan
             </button>
@@ -295,6 +305,21 @@ export default function ReportView({
           : <>Angka akun dari Insights untuk {fmtRange("monthly", period)}. Salin angkanya ke kotak di bawah; perubahan dibanding bulan lalu dan ER/Reach (engagement ÷ reach) dihitung otomatis.</>}
         {isCurrent && <> {kind === "weekly" ? "Minggu" : "Bulan"} ini masih berjalan.</>}
       </p>
+
+      {kind === "weekly" && curPosts.length === 0 && (
+        <div className="notice" style={{ margin: "0 0 12px" }}>
+          <Icon name="alert" size={14} />
+          <span>
+            Belum ada konten berstatus <b>Tayang</b> di {periodLabel(kind, period)}, jadi belum ada yang bisa di-export.
+            {nearestPeriod && (
+              <>
+                {" "}Konten tayang terdekat ada di{" "}
+                <button className="rp-link" onClick={() => setPeriod(nearestPeriod)}>{periodLabel(kind, nearestPeriod)}</button>.
+              </>
+            )}
+          </span>
+        </div>
+      )}
 
       {kind === "weekly" && missing.length > 0 && (
         <div className="notice" style={{ margin: "0 0 12px" }}>

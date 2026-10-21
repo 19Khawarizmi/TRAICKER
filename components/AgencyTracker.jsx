@@ -14,6 +14,7 @@ import TaskFeed from "@/components/TaskFeed";
 import CalendarView from "@/components/CalendarView";
 import TimelineView from "@/components/TimelineView";
 import ContentPlan from "@/components/ContentPlan";
+import Select from "@/components/Select";
 
 const COLUMNS = [
   { id: "todo", label: "Perlu Dikerjakan", color: "var(--s-todo)", dot: "" },
@@ -94,6 +95,17 @@ function Avatar({ profile, size = 20 }) {
 function StatusDot({ column }) {
   const col = COLUMN_BY_ID[column] || COLUMNS[0];
   return <span className={`status-dot ${col.dot}`} style={{ color: col.color }} />;
+}
+
+const COLUMN_OPTIONS = COLUMNS.map((c) => ({ value: c.id, label: c.label, leading: <StatusDot column={c.id} /> }));
+
+// Avatar kosong untuk "belum ditugaskan".
+function EmptyAvatar({ size = 22 }) {
+  return (
+    <span className="avatar" style={{ width: size, height: size, background: "var(--sunken)", color: "var(--faint)" }}>
+      <Icon name="user" size={Math.round(size * 0.55)} />
+    </span>
+  );
 }
 
 function Priority({ level }) {
@@ -573,7 +585,7 @@ export default function AgencyTracker() {
   // Esc menutup panel / dialog / popover yang sedang terbuka.
   useEffect(() => {
     function onKey(e) {
-      if (e.key !== "Escape") return;
+      if (e.key !== "Escape" || e.defaultPrevented) return;
       if (attentionOpen) setAttentionOpen(false);
       else if (userMenuOpen) setUserMenuOpen(false);
       else if (navOpen) setNavOpen(false);
@@ -608,9 +620,14 @@ export default function AgencyTracker() {
     : saveState === "saved" ? "Tersimpan"
     : saveState === "error" ? (saveError.includes("akses") || saveError.includes("hanya boleh") ? saveError : "Gagal menyimpan")
     : "";
-  const profileOptions = profiles.map((p) => (
-    <option key={p.id} value={p.id}>{p.name}{p.id === currentUserId ? " (saya)" : ""}</option>
-  ));
+  // Pilihan orang untuk dropdown (avatar + nama).
+  const personOptions = profiles.map((p) => ({
+    value: p.id,
+    label: `${p.name}${p.id === currentUserId ? " (saya)" : ""}`,
+    leading: <Avatar profile={p} size={18} />,
+    group: "Anggota",
+  }));
+  const unassignedOption = (label, value = "") => ({ value, label, leading: <EmptyAvatar size={18} /> });
 
   return (
     <div className="app">
@@ -844,23 +861,33 @@ export default function AgencyTracker() {
                 </button>
               ))}
             </div>
-            <select
-              className={`select ${assigneeFilter !== "all" ? "is-active" : ""}`}
+            <Select
+              variant="toolbar"
+              active={assigneeFilter !== "all"}
               value={assigneeFilter}
-              onChange={(e) => setAssigneeFilter(e.target.value)}
-              aria-label="Filter orang"
-            >
-              <option value="all">Semua orang</option>
-              <option value="me">Tugas saya</option>
-              <option value="none">Belum ditugaskan</option>
-              {profileOptions}
-            </select>
+              onChange={setAssigneeFilter}
+              ariaLabel="Filter orang"
+              searchPlaceholder="Cari anggota…"
+              options={[
+                { value: "all", label: "Semua orang", leading: <Icon name="users" size={14} /> },
+                { value: "me", label: "Tugas saya", leading: <Icon name="user" size={14} /> },
+                unassignedOption("Belum ditugaskan", "none"),
+                ...personOptions,
+              ]}
+            />
             {view === "board" && (
-            <select className={`select ${sortBy !== "default" ? "is-active" : ""}`} value={sortBy} onChange={(e) => setSortBy(e.target.value)} aria-label="Urutan">
-              <option value="default">Urutan manual</option>
-              <option value="due">Deadline terdekat</option>
-              <option value="client">Nama klien</option>
-            </select>
+            <Select
+              variant="toolbar"
+              active={sortBy !== "default"}
+              value={sortBy}
+              onChange={setSortBy}
+              ariaLabel="Urutan"
+              options={[
+                { value: "default", label: "Urutan manual", leading: <Icon name="grip" size={14} />, description: "Sesuai posisi kartu yang digeser" },
+                { value: "due", label: "Deadline terdekat", leading: <Icon name="calendar" size={14} /> },
+                { value: "client", label: "Nama klien", leading: <Icon name="folder" size={14} /> },
+              ]}
+            />
             )}
           </div>
         </section>
@@ -978,13 +1005,15 @@ export default function AgencyTracker() {
                             {/* Layar sentuh tidak mendukung tarik-geser kartu dengan baik: pindah kolom lewat pilihan ini.
                                 Disembunyikan di perangkat ber-mouse (lihat .card-move di CSS). */}
                             {draggable && (
-                              <label className="card-move" onClick={(e) => e.stopPropagation()} title="Pindah ke kolom lain">
-                                <Icon name="columns" size={12} />
-                                <span className="sr-only">Pindah ke</span>
-                                <select value={t.column} onChange={(e) => moveToColumn(t, e.target.value)} aria-label={`Pindahkan "${t.title}" ke kolom`}>
-                                  {COLUMNS.map((cc) => <option key={cc.id} value={cc.id}>{cc.label}</option>)}
-                                </select>
-                              </label>
+                              <Select
+                                variant="icon"
+                                className="card-move"
+                                icon={<Icon name="columns" size={12} />}
+                                value={t.column}
+                                onChange={(col) => moveToColumn(t, col)}
+                                ariaLabel={`Pindahkan "${t.title}" ke kolom`}
+                                options={COLUMN_OPTIONS}
+                              />
                             )}
                             {isDone && (
                               <input
@@ -1227,50 +1256,64 @@ export default function AgencyTracker() {
                 <div className="prop-label"><Icon name="status" size={14} />Status</div>
                 <div className="prop-value">
                   <StatusDot column={editing.column} />
-                  <select
-                    className="field"
+                  <Select
+                    variant="prop"
+                    triggerLeading={false}
                     value={editing.column}
-                    onChange={(e) => {
-                      const col = e.target.value;
-                      setEditing({ ...editing, column: col, due: col === "ongoing" ? "" : (editing.due || todayStr) });
-                    }}
+                    onChange={(col) => setEditing({ ...editing, column: col, due: col === "ongoing" ? "" : (editing.due || todayStr) })}
                     disabled={!modalCanEdit}
-                  >
-                    {COLUMNS.map((c) => <option key={c.id} value={c.id}>{c.label}{c.sub ? ` (${c.sub})` : ""}</option>)}
-                  </select>
+                    ariaLabel="Status"
+                    options={COLUMN_OPTIONS}
+                  />
                 </div>
 
                 <div className="prop-label"><Icon name="folder" size={14} />Klien</div>
                 <div className="prop-value">
                   <span className="dot" style={{ background: clientOf(editing.client).color }} />
-                  <select className="field" value={editing.client} onChange={(e) => setEditing({ ...editing, client: e.target.value })} disabled={!modalCanEdit}>
-                    {clients.filter((c) => !c.archived || c.id === editing.client).map((c) => (
-                      <option key={c.id} value={c.id}>{c.name}{c.archived ? " (diarsipkan)" : ""}</option>
-                    ))}
-                  </select>
+                  <Select
+                    variant="prop"
+                    triggerLeading={false}
+                    value={editing.client}
+                    onChange={(client) => setEditing({ ...editing, client })}
+                    disabled={!modalCanEdit}
+                    ariaLabel="Klien"
+                    searchPlaceholder="Cari klien…"
+                    options={clients.filter((c) => !c.archived || c.id === editing.client).map((c) => ({
+                      value: c.id,
+                      label: `${c.name}${c.archived ? " (diarsipkan)" : ""}`,
+                      leading: <span className="sel-swatch" style={{ "--swatch": c.color }} />,
+                    }))}
+                  />
                 </div>
 
                 <div className="prop-label"><Icon name="user" size={14} />Ditugaskan</div>
                 <div className="prop-value">
                   {profileOf(editing.assignee) ? <Avatar profile={profileOf(editing.assignee)} size={22} /> : <span className="avatar" style={{ width: 22, height: 22, background: "var(--sunken)", color: "var(--faint)" }}><Icon name="user" size={12} /></span>}
-                  <select
-                    className="field"
+                  <Select
+                    variant="prop"
+                    triggerLeading={false}
                     value={editing.assignee || ""}
-                    onChange={(e) => setEditing({ ...editing, assignee: e.target.value || null })}
+                    onChange={(v) => setEditing({ ...editing, assignee: v || null })}
                     disabled={!isAdmin}
-                    title={isAdmin ? "Ditugaskan ke" : "Hanya admin yang bisa mengubah penugasan"}
-                  >
-                    <option value="">Belum ditugaskan</option>
-                    {profileOptions}
-                  </select>
+                    title={isAdmin ? undefined : "Hanya admin yang bisa mengubah penugasan"}
+                    ariaLabel="Ditugaskan ke"
+                    searchPlaceholder="Cari anggota…"
+                    options={[unassignedOption("Belum ditugaskan"), ...personOptions]}
+                  />
                 </div>
 
                 <div className="prop-label"><Icon name="flag" size={14} />Prioritas</div>
                 <div className="prop-value">
                   <Priority level={editing.priority} />
-                  <select className="field" value={editing.priority} onChange={(e) => setEditing({ ...editing, priority: e.target.value })} disabled={!modalCanEdit}>
-                    {Object.keys(PRIORITIES).map((p) => <option key={p} value={p}>{p}</option>)}
-                  </select>
+                  <Select
+                    variant="prop"
+                    triggerLeading={false}
+                    value={editing.priority}
+                    onChange={(priority) => setEditing({ ...editing, priority })}
+                    disabled={!modalCanEdit}
+                    ariaLabel="Prioritas"
+                    options={Object.keys(PRIORITIES).map((p) => ({ value: p, label: p, leading: <Priority level={p} /> }))}
+                  />
                 </div>
 
                 <div className="prop-label"><Icon name="calendar" size={14} />Mulai</div>
@@ -1337,10 +1380,14 @@ export default function AgencyTracker() {
                               <div className="subtask-more">
                                 <div className="row">
                                   <Icon name="user" size={14} />
-                                  <select className="field" value={s.assignee || ""} onChange={(e) => updateSubtaskField(s.id, "assignee", e.target.value || null)} disabled={!modalCanEdit}>
-                                    <option value="">Belum ditugaskan</option>
-                                    {profileOptions}
-                                  </select>
+                                  <Select
+                                    value={s.assignee || ""}
+                                    onChange={(v) => updateSubtaskField(s.id, "assignee", v || null)}
+                                    disabled={!modalCanEdit}
+                                    ariaLabel="Subtask ditugaskan ke"
+                                    searchPlaceholder="Cari anggota…"
+                                    options={[unassignedOption("Belum ditugaskan"), ...personOptions]}
+                                  />
                                 </div>
                                 <div className="row">
                                   <Icon name="link" size={14} />

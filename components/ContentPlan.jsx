@@ -8,6 +8,7 @@ import { exportContentPlan } from "@/lib/exportContent";
 import Icon from "@/components/icons";
 import TaskFeed from "@/components/TaskFeed";
 import ReportView from "@/components/ReportView";
+import Select from "@/components/Select";
 import { METRIC_FIELDS, hasValues, engagementOf, actionsOf, erOf, fmtInt, fmtPct } from "@/lib/contentMetrics";
 
 // Ruang kerja Content plan: kalender, pipeline per tahap produksi, dan tabel.
@@ -39,6 +40,22 @@ function ApprovalChip({ value, small }) {
   const a = APPROVAL_BY_ID[value] || APPROVALS[0];
   if (value === "none" && small) return null;
   return <span className={`apv is-${a.tone} ${small ? "is-small" : ""}`}>{a.label}</span>;
+}
+
+const STAGE_OPTIONS = STAGES.map((s) => ({ value: s.id, label: s.label, leading: <span className={`status-dot ${s.dot}`} style={{ color: s.color }} /> }));
+
+const platformOption = (p) => ({
+  value: p.id,
+  label: `${p.name}${p.archived ? " (arsip)" : ""}`,
+  leading: <span className="pf-badge is-mini" style={{ "--pf": p.color }}>{p.short}</span>,
+});
+
+function EmptyAvatar({ size = 18 }) {
+  return (
+    <span className="avatar" style={{ width: size, height: size, background: "var(--sunken)", color: "var(--faint)" }}>
+      <Icon name="user" size={Math.round(size * 0.55)} />
+    </span>
+  );
 }
 
 function PlatformTag({ platform, format }) {
@@ -205,7 +222,7 @@ export default function ContentPlan({
   // Esc menutup panel / dialog milik ruang kerja ini.
   useEffect(() => {
     function onKey(e) {
-      if (e.key !== "Escape") return;
+      if (e.key !== "Escape" || e.defaultPrevented) return;
       if (platformDialog) setPlatformDialog(false);
       else if (editing) setEditing(null);
     }
@@ -301,7 +318,13 @@ export default function ContentPlan({
   const waiting = visiblePosts.filter((p) => p.approval === "waiting").length;
   const late = visiblePosts.filter((p) => p.date && p.date < todayStr && !["scheduled", "published"].includes(p.status)).length;
   const viewClient = activeClient === "all" ? null : clientOf(activeClient);
-  const profileOptions = profiles.map((p) => <option key={p.id} value={p.id}>{p.name}{p.id === currentUserId ? " (saya)" : ""}</option>);
+  // Pilihan orang untuk dropdown (avatar + nama).
+  const personOptions = profiles.map((p) => ({
+    value: p.id,
+    label: `${p.name}${p.id === currentUserId ? " (saya)" : ""}`,
+    leading: <Avatar profile={p} size={18} />,
+    group: "Anggota",
+  }));
 
   return (
     <>
@@ -334,16 +357,28 @@ export default function ContentPlan({
           </div>
           {view !== "report" && (
             <>
-              <select className={`select ${platformFilter !== "all" ? "is-active" : ""}`} value={platformFilter} onChange={(e) => setPlatformFilter(e.target.value)} aria-label="Filter platform">
-                <option value="all">Semua platform</option>
-                {platforms.map((p) => <option key={p.id} value={p.id}>{p.name}{p.archived ? " (arsip)" : ""}</option>)}
-              </select>
-              <select className={`select ${personFilter !== "all" ? "is-active" : ""}`} value={personFilter} onChange={(e) => setPersonFilter(e.target.value)} aria-label="Filter orang">
-                <option value="all">Semua orang</option>
-                <option value="me">Konten saya</option>
-                <option value="none">Belum ada PIC</option>
-                {profileOptions}
-              </select>
+              <Select
+                variant="toolbar"
+                active={platformFilter !== "all"}
+                value={platformFilter}
+                onChange={setPlatformFilter}
+                ariaLabel="Filter platform"
+                options={[{ value: "all", label: "Semua platform", leading: <Icon name="columns" size={14} /> }, ...platforms.map(platformOption)]}
+              />
+              <Select
+                variant="toolbar"
+                active={personFilter !== "all"}
+                value={personFilter}
+                onChange={setPersonFilter}
+                ariaLabel="Filter orang"
+                searchPlaceholder="Cari anggota…"
+                options={[
+                  { value: "all", label: "Semua orang", leading: <Icon name="users" size={14} /> },
+                  { value: "me", label: "Konten saya", leading: <Icon name="user" size={14} /> },
+                  { value: "none", label: "Belum ada PIC", leading: <EmptyAvatar /> },
+                  ...personOptions,
+                ]}
+              />
               <button className="btn btn-secondary btn-sm toolbar-export" onClick={runExport} disabled={exporting || visiblePosts.length === 0} title="Export Excel konten yang sedang tampil">
                 {exporting ? <span className="spinner" /> : <Icon name="download" size={13} />}
                 Export
@@ -517,7 +552,7 @@ export default function ContentPlan({
           platforms={platforms}
           posts={posts}
           profiles={profiles}
-          profileOptions={profileOptions}
+          personOptions={personOptions}
           currentUserId={currentUserId}
           isAdmin={isAdmin}
           canEditPost={canEditPost}
@@ -565,13 +600,15 @@ function PostCard({ post: p, index, platform, client, people, Avatar, todayStr, 
           <span>{client.short}</span>
         </span>
         {draggable && (
-          <label className="card-move" onClick={(e) => e.stopPropagation()} title="Pindah tahap">
-            <Icon name="columns" size={12} />
-            <span className="sr-only">Pindah ke</span>
-            <select value={p.status} onChange={(e) => onMove(e.target.value)} aria-label={`Pindahkan "${p.title}" ke tahap`}>
-              {STAGES.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
-            </select>
-          </label>
+          <Select
+            variant="icon"
+            className="card-move"
+            icon={<Icon name="columns" size={12} />}
+            value={p.status}
+            onChange={onMove}
+            ariaLabel={`Pindahkan "${p.title}" ke tahap`}
+            options={STAGE_OPTIONS}
+          />
         )}
       </div>
       <div className="card-title">{p.title}</div>
@@ -724,7 +761,7 @@ function ContentCalendar({ posts, cursor, setCursor, todayStr, platformOf, clien
 // ---------------------------------------------------------------------------------------------
 // Panel detail konten
 
-function PostDrawer({ editing, setEditing, saved, clients, platforms, posts, profileOptions, currentUserId, isAdmin, canEditPost, canDeletePost, clientOf, platformOf, profileOf, Avatar, onSave, onDelete }) {
+function PostDrawer({ editing, setEditing, saved, clients, platforms, posts, personOptions, currentUserId, isAdmin, canEditPost, canDeletePost, clientOf, platformOf, profileOf, Avatar, onSave, onDelete }) {
   const canEdit = editing.isNew || (!!saved && canEditPost(saved));
   const pf = platformOf(editing.platform);
   const set = (fields) => setEditing((prev) => ({ ...prev, ...fields }));
@@ -772,32 +809,37 @@ function PostDrawer({ editing, setEditing, saved, clients, platforms, posts, pro
             <div className="prop-label"><Icon name="status" size={14} />Tahap</div>
             <div className="prop-value">
               <span className={`status-dot ${stage?.dot}`} style={{ color: stage?.color }} />
-              <select className="field" value={editing.status} onChange={(e) => set({ status: e.target.value })} disabled={!canEdit}>
-                {STAGES.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
-              </select>
+              <Select variant="prop" triggerLeading={false} value={editing.status} onChange={(status) => set({ status })} disabled={!canEdit} ariaLabel="Tahap" options={STAGE_OPTIONS} />
             </div>
 
             <div className="prop-label"><Icon name="folder" size={14} />Klien</div>
             <div className="prop-value">
               <span className="dot" style={{ background: clientOf(editing.client).color }} />
-              <select className="field" value={editing.client} onChange={(e) => set({ client: e.target.value })} disabled={!canEdit}>
-                {clients.filter((c) => !c.archived || c.id === editing.client).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
+              <Select
+                variant="prop"
+                triggerLeading={false}
+                value={editing.client}
+                onChange={(client) => set({ client })}
+                disabled={!canEdit}
+                ariaLabel="Klien"
+                searchPlaceholder="Cari klien…"
+                options={clients.filter((c) => !c.archived || c.id === editing.client).map((c) => ({ value: c.id, label: c.name, leading: <span className="sel-swatch" style={{ "--swatch": c.color }} /> }))}
+              />
             </div>
 
             <div className="prop-label"><Icon name="columns" size={14} />Platform</div>
             <div className="prop-value cp-two">
-              <select
-                className="field"
+              <Select
+                variant="prop"
                 value={editing.platform}
-                onChange={(e) => {
-                  const next = platformOf(e.target.value);
-                  set({ platform: e.target.value, format: next?.formats?.includes(editing.format) ? editing.format : next?.formats?.[0] || "" });
+                onChange={(id) => {
+                  const next = platformOf(id);
+                  set({ platform: id, format: next?.formats?.includes(editing.format) ? editing.format : next?.formats?.[0] || "" });
                 }}
                 disabled={!canEdit}
-              >
-                {platforms.filter((p) => !p.archived || p.id === editing.platform).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
+                ariaLabel="Platform"
+                options={platforms.filter((p) => !p.archived || p.id === editing.platform).map(platformOption)}
+              />
               <input className="field" list="cp-formats" value={editing.format} onChange={(e) => set({ format: e.target.value })} disabled={!canEdit} placeholder="Format" aria-label="Format" />
               <datalist id="cp-formats">{(pf?.formats || []).map((f) => <option key={f} value={f} />)}</datalist>
             </div>
@@ -817,19 +859,31 @@ function PostDrawer({ editing, setEditing, saved, clients, platforms, posts, pro
             <div className="prop-label"><Icon name="user" size={14} />Sosmed</div>
             <div className="prop-value">
               {profileOf(editing.specialist) ? <Avatar profile={profileOf(editing.specialist)} size={22} /> : <span className="avatar" style={{ width: 22, height: 22, background: "var(--sunken)", color: "var(--faint)" }}><Icon name="user" size={12} /></span>}
-              <select className="field" value={editing.specialist || ""} onChange={(e) => set({ specialist: e.target.value || null })} disabled={!canEdit} aria-label="Sosmed specialist">
-                <option value="">Belum ada sosmed specialist</option>
-                {profileOptions}
-              </select>
+              <Select
+                variant="prop"
+                triggerLeading={false}
+                value={editing.specialist || ""}
+                onChange={(v) => set({ specialist: v || null })}
+                disabled={!canEdit}
+                ariaLabel="Sosmed specialist"
+                searchPlaceholder="Cari anggota…"
+                options={[{ value: "", label: "Belum ada sosmed specialist", leading: <EmptyAvatar /> }, ...personOptions]}
+              />
             </div>
 
             <div className="prop-label"><Icon name="edit" size={14} />Desainer</div>
             <div className="prop-value">
               {profileOf(editing.designer) ? <Avatar profile={profileOf(editing.designer)} size={22} /> : <span className="avatar" style={{ width: 22, height: 22, background: "var(--sunken)", color: "var(--faint)" }}><Icon name="user" size={12} /></span>}
-              <select className="field" value={editing.designer || ""} onChange={(e) => set({ designer: e.target.value || null })} disabled={!canEdit} aria-label="Desainer">
-                <option value="">Belum ada desainer</option>
-                {profileOptions}
-              </select>
+              <Select
+                variant="prop"
+                triggerLeading={false}
+                value={editing.designer || ""}
+                onChange={(v) => set({ designer: v || null })}
+                disabled={!canEdit}
+                ariaLabel="Desainer"
+                searchPlaceholder="Cari anggota…"
+                options={[{ value: "", label: "Belum ada desainer", leading: <EmptyAvatar /> }, ...personOptions]}
+              />
             </div>
             {canEdit && !holdsIt && <div className="prop-hint" style={{ color: "var(--danger)" }}>Pilih dirimu sebagai sosmed specialist atau desainer supaya bisa menyimpan.</div>}
 

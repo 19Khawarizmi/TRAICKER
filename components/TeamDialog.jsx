@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Icon from "@/components/icons";
+import Select from "@/components/Select";
 import * as db from "@/lib/trackerData";
 
 // Kelola anggota tim (hanya admin). Semua aksi dicek ulang di server (/api/admin/users),
@@ -55,12 +56,21 @@ function PasswordField({ value, onChange, placeholder }) {
   );
 }
 
+const ROLE_OPTIONS = [
+  { value: "member", label: "Member", description: "Mengerjakan tugas yang ditugaskan ke dirinya", leading: <Icon name="user" size={14} /> },
+  { value: "admin", label: "Admin", description: "Akses penuh, termasuk kelola klien & anggota", leading: <Icon name="lock" size={14} /> },
+];
+
 function RoleSelect({ value, onChange, disabled, title }) {
   return (
-    <select className="field" value={value} onChange={(e) => onChange(e.target.value)} disabled={disabled} title={title}>
-      <option value="member">Member — mengerjakan tugas yang ditugaskan ke dirinya</option>
-      <option value="admin">Admin — akses penuh, termasuk kelola klien &amp; anggota</option>
-    </select>
+    <Select
+      value={value}
+      onChange={onChange}
+      disabled={disabled}
+      title={title}
+      ariaLabel="Peran"
+      options={ROLE_OPTIONS}
+    />
   );
 }
 
