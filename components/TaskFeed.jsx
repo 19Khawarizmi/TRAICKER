@@ -24,7 +24,7 @@ const ICONS = {
   created: "plus", status: "status", assigned: "user", due: "calendar", start: "calendar", priority: "flag",
   title: "edit", client: "folder", subtask_added: "plus", subtask_done: "check", subtask_undone: "restore",
   subtask_assigned: "user", subtask_renamed: "edit", subtask_removed: "x",
-  approval: "check", schedule: "calendar", specialist: "user", designer: "user", platform: "columns",
+  approval: "check", schedule: "calendar", specialist: "user", designer: "user", platform: "columns", metrics: "flag",
 };
 
 function describe(item, { columnLabel, personName, clientName, platformName, approvalLabel }) {
@@ -44,6 +44,7 @@ function describe(item, { columnLabel, personName, clientName, platformName, app
     case "specialist": return m.to ? <>menugaskan sosmed specialist <b>{personName(m.to)}</b></> : "menghapus sosmed specialist";
     case "designer": return m.to ? <>menugaskan desainer <b>{personName(m.to)}</b></> : "menghapus desainer";
     case "platform": return <>mengubah platform ke <b>{platformName(m.platform)}{m.format ? ` · ${m.format}` : ""}</b></>;
+    case "metrics": return m.reach != null ? <>memperbarui metrik performa (reach <b>{Number(m.reach).toLocaleString("id-ID")}</b>)</> : "memperbarui metrik performa";
     case "subtask_added": return <>menambah subtask {q(m.text)}</>;
     case "subtask_done": return <>menyelesaikan {q(m.text)}</>;
     case "subtask_undone": return <>membuka lagi {q(m.text)}</>;

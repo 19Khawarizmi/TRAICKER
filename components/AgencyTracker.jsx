@@ -18,7 +18,6 @@ import ContentPlan from "@/components/ContentPlan";
 const COLUMNS = [
   { id: "todo", label: "Perlu Dikerjakan", color: "var(--s-todo)", dot: "" },
   { id: "progress", label: "Sedang Berjalan", color: "var(--s-progress)", dot: "is-half" },
-  { id: "ongoing", label: "Ongoing", sub: "s/d event selesai", color: "var(--s-ongoing)", dot: "is-half" },
   { id: "review", label: "Review", color: "var(--s-review)", dot: "is-half" },
   { id: "done", label: "Selesai", color: "var(--s-done)", dot: "is-filled" },
 ];

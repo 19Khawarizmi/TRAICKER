@@ -7,6 +7,8 @@ import { STAGES, STAGE_BY_ID, APPROVALS, APPROVAL_BY_ID } from "@/lib/contentDat
 import { exportContentPlan } from "@/lib/exportContent";
 import Icon from "@/components/icons";
 import TaskFeed from "@/components/TaskFeed";
+import ReportView from "@/components/ReportView";
+import { METRIC_FIELDS, hasValues, engagementOf, actionsOf, erOf, fmtInt, fmtPct } from "@/lib/contentMetrics";
 
 // Ruang kerja Content plan: kalender, pipeline per tahap produksi, dan tabel.
 // Klien, anggota, pencarian, notifikasi & status simpan dibagi dengan ruang kerja Project (AgencyTracker).
@@ -56,8 +58,12 @@ export default function ContentPlan({
   const [platforms, setPlatforms] = useState([]);
   const [posts, setPosts] = useState([]);
   const [loaded, setLoaded] = useState(false);
+  const [followers, setFollowers] = useState([]);
+  const [targets, setTargets] = useState([]);
+  const [quotas, setQuotas] = useState([]);
+  const [insights, setInsights] = useState([]);
   const [loadError, setLoadError] = useState("");
-  const [view, setView] = useState("calendar"); // calendar | pipeline | table
+  const [view, setView] = useState("calendar"); // calendar | pipeline | table | report
   const [personFilter, setPersonFilter] = useState("all"); // all | me | none | id
   const [platformFilter, setPlatformFilter] = useState("all");
   const [editing, setEditing] = useState(null);
@@ -77,6 +83,10 @@ export default function ContentPlan({
       const board = await cdb.fetchContentBoard();
       setPlatforms(board.platforms);
       setPosts(board.posts);
+      setFollowers(board.followers);
+      setTargets(board.targets);
+      setQuotas(board.quotas);
+      setInsights(board.insights);
       setLoadError("");
     } catch (e) {
       setLoadError(e.message || "Gagal memuat content plan");
@@ -88,7 +98,7 @@ export default function ContentPlan({
     load();
     try {
       const saved = localStorage.getItem("traicker:content-view");
-      if (saved === "pipeline" || saved === "table") setView(saved);
+      if (saved === "pipeline" || saved === "table" || saved === "report") setView(saved);
     } catch {}
     // Realtime: perubahan konten & platform dari anggota lain.
     let timer;
@@ -107,6 +117,10 @@ export default function ContentPlan({
       .channel("content-sync")
       .on("postgres_changes", { event: "*", schema: "public", table: "content_posts" }, schedule)
       .on("postgres_changes", { event: "*", schema: "public", table: "content_platforms" }, schedule)
+      .on("postgres_changes", { event: "*", schema: "public", table: "content_followers" }, schedule)
+      .on("postgres_changes", { event: "*", schema: "public", table: "content_targets" }, schedule)
+      .on("postgres_changes", { event: "*", schema: "public", table: "content_quotas" }, schedule)
+      .on("postgres_changes", { event: "*", schema: "public", table: "content_insights" }, schedule)
       .subscribe();
     return () => {
       clearTimeout(timer);
@@ -223,6 +237,9 @@ export default function ContentPlan({
       specialist: isAdmin ? null : currentUserId,
       designer: null,
       createdBy: currentUserId,
+      metrics: {},
+      boosted: false,
+      insight: "",
     });
   }
 
@@ -235,7 +252,9 @@ export default function ContentPlan({
     const { isNew, ...post } = editing;
     const original = isNew ? null : posts.find((p) => p.id === post.id);
     post.approvalChanged = !original || original.approval !== post.approval;
-    const { approvalChanged, ...local } = post;
+    post.metricsChanged = METRIC_FIELDS.some((f) => (original?.metrics?.[f.key] ?? null) !== (post.metrics?.[f.key] ?? null));
+    const { approvalChanged, metricsChanged, ...local } = post;
+    if (metricsChanged) local.metricsUpdatedAt = new Date().toISOString();
     if (isNew) setPosts((prev) => [...prev, local]);
     else setPosts((prev) => prev.map((p) => (p.id === post.id ? local : p)));
     setEditing(null);
@@ -305,6 +324,7 @@ export default function ContentPlan({
               ["calendar", "Kalender", "calendar"],
               ["pipeline", "Pipeline", "columns"],
               ["table", "Tabel", "note"],
+              ["report", "Report", "flag"],
             ].map(([id, label, icon]) => (
               <button key={id} role="tab" aria-selected={view === id} className={view === id ? "is-active" : ""} onClick={() => changeView(id)}>
                 <Icon name={icon} size={13} />
@@ -312,24 +332,28 @@ export default function ContentPlan({
               </button>
             ))}
           </div>
-          <select className={`select ${platformFilter !== "all" ? "is-active" : ""}`} value={platformFilter} onChange={(e) => setPlatformFilter(e.target.value)} aria-label="Filter platform">
-            <option value="all">Semua platform</option>
-            {platforms.map((p) => <option key={p.id} value={p.id}>{p.name}{p.archived ? " (arsip)" : ""}</option>)}
-          </select>
-          <select className={`select ${personFilter !== "all" ? "is-active" : ""}`} value={personFilter} onChange={(e) => setPersonFilter(e.target.value)} aria-label="Filter orang">
-            <option value="all">Semua orang</option>
-            <option value="me">Konten saya</option>
-            <option value="none">Belum ada PIC</option>
-            {profileOptions}
-          </select>
-          <button className="btn btn-secondary btn-sm toolbar-export" onClick={runExport} disabled={exporting || visiblePosts.length === 0} title="Export Excel konten yang sedang tampil">
-            {exporting ? <span className="spinner" /> : <Icon name="download" size={13} />}
-            Export
-          </button>
+          {view !== "report" && (
+            <>
+              <select className={`select ${platformFilter !== "all" ? "is-active" : ""}`} value={platformFilter} onChange={(e) => setPlatformFilter(e.target.value)} aria-label="Filter platform">
+                <option value="all">Semua platform</option>
+                {platforms.map((p) => <option key={p.id} value={p.id}>{p.name}{p.archived ? " (arsip)" : ""}</option>)}
+              </select>
+              <select className={`select ${personFilter !== "all" ? "is-active" : ""}`} value={personFilter} onChange={(e) => setPersonFilter(e.target.value)} aria-label="Filter orang">
+                <option value="all">Semua orang</option>
+                <option value="me">Konten saya</option>
+                <option value="none">Belum ada PIC</option>
+                {profileOptions}
+              </select>
+              <button className="btn btn-secondary btn-sm toolbar-export" onClick={runExport} disabled={exporting || visiblePosts.length === 0} title="Export Excel konten yang sedang tampil">
+                {exporting ? <span className="spinner" /> : <Icon name="download" size={13} />}
+                Export
+              </button>
+            </>
+          )}
         </div>
       </section>
 
-      {posts.length === 0 && (
+      {posts.length === 0 && view !== "report" && (
         <div className="cp-empty">
           <h3>Mulai content plan pertamamu</h3>
           <p>Buat konten untuk tiap klien: platform, jadwal tayang, brief, caption, dan link visual. Klik <b>Konten baru</b> di atas.</p>
@@ -457,6 +481,31 @@ export default function ContentPlan({
             </table>
           </div>
         </div>
+      )}
+
+      {view === "report" && (
+        <ReportView
+          posts={posts.filter((p) => !archivedClientIds.has(p.client))}
+          platforms={platforms}
+          clients={clients}
+          activeClients={activeClients}
+          activeClient={activeClient}
+          followers={followers}
+          targets={targets}
+          quotas={quotas}
+          insights={insights}
+          isAdmin={isAdmin}
+          currentUserId={currentUserId}
+          clientOf={clientOf}
+          profileOf={profileOf}
+          todayStr={todayStr}
+          onOpen={openEdit}
+          save={save}
+          setFollowers={setFollowers}
+          setTargets={setTargets}
+          setQuotas={setQuotas}
+          setInsights={setInsights}
+        />
       )}
 
       {editing && (
@@ -839,6 +888,10 @@ function PostDrawer({ editing, setEditing, saved, clients, platforms, posts, pro
             )}
           </div>
 
+          {(editing.status === "published" || hasValues(editing.metrics)) && (
+            <PerformanceSection editing={editing} saved={saved} set={set} canEdit={canEdit} />
+          )}
+
           {!editing.isNew && (
             <TaskFeed
               key={editing.id}
@@ -873,6 +926,56 @@ function PostDrawer({ editing, setEditing, saved, clients, platforms, posts, pro
         </div>
       </aside>
     </>
+  );
+}
+
+// ---------------------------------------------------------------------------------------------
+// Performa konten (diisi saat report mingguan, Senin setelah konten tayang)
+
+function PerformanceSection({ editing, saved, set, canEdit }) {
+  const values = editing.metrics || {};
+  const filled = hasValues(values);
+
+  return (
+    <div className="cp-section">
+      <div className="section-head" style={{ marginBottom: 6 }}>
+        <span className="section-title">Performa</span>
+        {saved?.metricsUpdatedAt && (
+          <span className="progress-label" style={{ marginLeft: "auto" }}>
+            Diperbarui {new Date(saved.metricsUpdatedAt).toLocaleString("id-ID", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+          </span>
+        )}
+      </div>
+      <p className="cp-metric-hint">Diisi saat report mingguan (Senin setelah konten tayang). Report bulanan memakai angka akun dari Insights.</p>
+      <div className="cp-metrics">
+        {METRIC_FIELDS.map((f) => (
+          <label key={f.key} className="cp-metric">
+            <span>{f.label}</span>
+            <input
+              className="field mono"
+              inputMode="numeric"
+              value={values[f.key] ?? ""}
+              onChange={(e) => {
+                const raw = e.target.value.replace(/D/g, "");
+                set({ metrics: { ...values, [f.key]: raw === "" ? null : Number(raw) } });
+              }}
+              disabled={!canEdit}
+              placeholder="—"
+            />
+          </label>
+        ))}
+      </div>
+      <div className="cp-metric-sum">
+        <span>Engagement <b className="mono">{filled ? fmtInt(engagementOf(editing)) : "—"}</b></span>
+        <span>ER <b className="mono">{fmtPct(erOf(editing), 2)}</b></span>
+        <span>Aksi <b className="mono">{filled ? fmtInt(actionsOf(editing)) : "—"}</b></span>
+      </div>
+      <label className="cp-boost">
+        <input type="checkbox" checked={!!editing.boosted} onChange={(e) => set({ boosted: e.target.checked })} disabled={!canEdit} />
+        Konten ini di-boost (iklan)
+      </label>
+      <textarea className="field" rows={2} value={editing.insight || ""} onChange={(e) => set({ insight: e.target.value })} disabled={!canEdit} placeholder="Insight / catatan performa, mis. reach naik karena kolaborasi" aria-label="Insight performa" />
+    </div>
   );
 }
 

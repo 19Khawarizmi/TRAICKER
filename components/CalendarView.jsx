@@ -140,7 +140,7 @@ export default function CalendarView({ tasks, todayStr, clientOf, isOverdue, can
 
       {undated.length > 0 && (
         <div className="calendar-undated">
-          <span className="text-muted">Tanpa deadline / ongoing:</span>
+          <span className="text-muted">Tanpa deadline:</span>
           {undated.map((t) => (
             <button key={t.id} className="calendar-chip" style={{ "--chip": clientOf(t.client).color }} onClick={() => onOpen(t)}>
               <span className="dot" style={{ background: clientOf(t.client).color, width: 6, height: 6 }} />
