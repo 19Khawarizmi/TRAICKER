@@ -15,6 +15,7 @@ import CalendarView from "@/components/CalendarView";
 import TimelineView from "@/components/TimelineView";
 import ContentPlan from "@/components/ContentPlan";
 import Select from "@/components/Select";
+import BrandMark from "@/components/BrandMark";
 
 const COLUMNS = [
   { id: "todo", label: "Perlu Dikerjakan", color: "var(--s-todo)", dot: "" },
@@ -635,7 +636,7 @@ export default function AgencyTracker() {
       {navOpen && <div className="nav-scrim" onClick={() => setNavOpen(false)} />}
       <aside className={`sidebar ${navOpen ? "is-open" : ""}`} aria-label="Navigasi">
         <div className="brand">
-          <div className="brand-mark" aria-hidden="true">Ai</div>
+          <BrandMark />
           <div className="brand-name">Tr<em>ai</em>cker</div>
           <button className="btn btn-ghost btn-icon nav-close" onClick={() => setNavOpen(false)} aria-label="Tutup menu">
             <Icon name="x" />
@@ -698,7 +699,7 @@ export default function AgencyTracker() {
             <Icon name="menu" />
           </button>
           <div className="topbar-brand" aria-hidden="true">
-            <div className="brand-mark">Ai</div>
+            <BrandMark />
             <span className="brand-name">Tr<em>ai</em>cker</span>
           </div>
           <label className="search">

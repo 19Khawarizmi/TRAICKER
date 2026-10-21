@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import Icon from "@/components/icons";
+import BrandMark from "@/components/BrandMark";
 import { useTheme } from "@/components/theme";
 import IdleLogout, { markActivity, IDLE_TIMEOUT_MS, LOGOUT_REASON_KEY } from "@/components/IdleLogout";
 
@@ -20,7 +21,7 @@ function friendlyError(code, fallback) {
 export function Splash({ label = "Memuat…" }) {
   return (
     <div className="splash">
-      <div className="brand-mark auth-mark" style={{ margin: 0 }} aria-hidden="true">Ai</div>
+      <BrandMark className="auth-mark" />
       {label}
     </div>
   );
@@ -96,7 +97,7 @@ export default function AuthGate({ children }) {
         <Icon name={resolvedTheme === "dark" ? "sun" : "moon"} />
       </button>
       <div className="auth-card">
-        <div className="brand-mark auth-mark" aria-hidden="true">Ai</div>
+        <BrandMark className="auth-mark" />
         <h1 className="auth-title">
           Tr<em>ai</em>cker
         </h1>

@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-labelledby="title">
+  <title id="title">Traicker — Ai</title>
+  <defs>
+    <!-- Sama dengan ai-mark.svg: didominasi merah, bergeser ke merah-oranye di bawah. -->
+    <linearGradient id="ai-square-bg" x1="0" y1="0" x2="0" y2="120" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#E3101A" />
+      <stop offset="0.55" stop-color="#EF1A17" />
+      <stop offset="1" stop-color="#FF4F1F" />
+    </linearGradient>
+  </defs>
+  <rect width="120" height="120" fill="url(#ai-square-bg)" />
+  <!-- Huruf "A" putih (bentuk sama dengan ai-mark.svg), diperkecil ke tengah supaya ada ruang napas. -->
+  <path
+    fill="#FFFFFF"
+    fill-rule="evenodd"
+    transform="translate(60 60) scale(0.6) translate(-60 -60)"
+    d="M47 8H73L112 112H87A27 27 0 0 0 33 112H8ZM46 57A14 14 0 1 0 74 57A14 14 0 1 0 46 57Z"
+  />
+</svg>

@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-labelledby="title">
+  <title id="title">Traicker — Ai</title>
+  <defs>
+    <!-- Didominasi merah; baru bergeser ke merah-oranye di bagian kaki. -->
+    <linearGradient id="ai-mark-fill" x1="0" y1="8" x2="0" y2="112" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#E3101A" />
+      <stop offset="0.55" stop-color="#EF1A17" />
+      <stop offset="1" stop-color="#FF4F1F" />
+    </linearGradient>
+  </defs>
+  <!-- Huruf "A" berbentuk trapesium. Lubang lingkaran = kepala / titik huruf "i";
+       lengkung di bawah = bahu. Bersama-sama membentuk siluet orang di dalam "A". -->
+  <path
+    fill="url(#ai-mark-fill)"
+    fill-rule="evenodd"
+    d="M47 8H73L112 112H87A27 27 0 0 0 33 112H8ZM46 57A14 14 0 1 0 74 57A14 14 0 1 0 46 57Z"
+  />
+</svg>

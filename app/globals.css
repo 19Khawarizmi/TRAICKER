@@ -29,7 +29,7 @@
   --ongoing-b: #ebe8f4;
   --glow-a: rgba(201, 138, 26, 0.08);
   --glow-b: rgba(61, 111, 166, 0.07);
-  --brand-accent: #c07e12;
+  --brand-accent: #d4141c;
   color-scheme: light;
 
   --danger: #b4453f;
@@ -65,23 +65,24 @@
 }
 
 /* ---------- Mode gelap ----------
-   Hangat dan kontras lembut (teks bukan putih murni, latar bukan hitam pekat) supaya tidak melelahkan mata.
+   Abu-abu netral murni (tanpa nada coklat/merah); warna hanya datang dari logo, aksen, dan status.
+   Kontras lembut (teks bukan putih murni, latar bukan hitam pekat) supaya tidak melelahkan mata.
    Mengikuti sistem kecuali user memilih tema sendiri (data-theme di <html>). */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #141413;
-    --surface: #201f1d;
-    --surface-2: #1a1a18;
-    --sunken: #1a1917;
-    --hover: #2a2926;
+    --bg: #171717;
+    --surface: #212121;
+    --surface-2: #1b1b1b;
+    --sunken: #1a1a1a;
+    --hover: #2b2b2b;
 
-    --ink: #e9e7e1;
-    --ink-2: #c2bfb7;
-    --muted: #8e8b83;
-    --faint: #5f5d57;
+    --ink: #e2e2e2;
+    --ink-2: #bcbcbc;
+    --muted: #8e8e8e;
+    --faint: #5f5f5f;
 
-    --line: #2c2b28;
-    --line-strong: #3b3a36;
+    --line: #2e2e2e;
+    --line-strong: #3d3d3d;
 
     --danger: #e08a82;
     --danger-bg: rgba(224, 138, 130, 0.12);
@@ -92,7 +93,7 @@
     --info: #86ade0;
     --info-bg: rgba(134, 173, 224, 0.12);
 
-    --s-todo: #78756d;
+    --s-todo: #7a7a7a;
     --s-progress: #dfaa5e;
     --s-ongoing: #a99ae8;
     --s-review: #86ade0;
@@ -103,36 +104,36 @@
     --shadow: 0 2px 4px -1px rgba(0, 0, 0, 0.35), 0 10px 24px -8px rgba(0, 0, 0, 0.5);
     --shadow-lg: 0 24px 60px -16px rgba(0, 0, 0, 0.7), 0 4px 12px -4px rgba(0, 0, 0, 0.4);
 
-    --on-ink: #141413;
+    --on-ink: #171717;
     --on-ok: #10261c;
     --ink-hover: #ffffff;
-    --ring: rgba(233, 231, 225, 0.12);
-    --selection: rgba(233, 231, 225, 0.18);
-    --topbar-bg: rgba(20, 20, 19, 0.8);
+    --ring: rgba(226, 226, 226, 0.12);
+    --selection: rgba(226, 226, 226, 0.18);
+    --topbar-bg: rgba(23, 23, 23, 0.82);
     --scrim: rgba(0, 0, 0, 0.55);
-    --ongoing-a: #1d1b25;
-    --ongoing-b: #1b1a22;
-    --glow-a: rgba(223, 170, 94, 0.06);
-    --glow-b: rgba(134, 173, 224, 0.06);
-    --brand-accent: #e6b467;
+    --ongoing-a: #1d1d21;
+    --ongoing-b: #1b1b1f;
+    --glow-a: rgba(255, 255, 255, 0.02);
+    --glow-b: rgba(255, 255, 255, 0.015);
+    --brand-accent: #ff5a4d;
     color-scheme: dark;
   }
 }
 
 :root[data-theme="dark"] {
-  --bg: #141413;
-  --surface: #201f1d;
-  --surface-2: #1a1a18;
-  --sunken: #1a1917;
-  --hover: #2a2926;
+  --bg: #171717;
+  --surface: #212121;
+  --surface-2: #1b1b1b;
+  --sunken: #1a1a1a;
+  --hover: #2b2b2b;
 
-  --ink: #e9e7e1;
-  --ink-2: #c2bfb7;
-  --muted: #8e8b83;
-  --faint: #5f5d57;
+  --ink: #e2e2e2;
+  --ink-2: #bcbcbc;
+  --muted: #8e8e8e;
+  --faint: #5f5f5f;
 
-  --line: #2c2b28;
-  --line-strong: #3b3a36;
+  --line: #2e2e2e;
+  --line-strong: #3d3d3d;
 
   --danger: #e08a82;
   --danger-bg: rgba(224, 138, 130, 0.12);
@@ -143,7 +144,7 @@
   --info: #86ade0;
   --info-bg: rgba(134, 173, 224, 0.12);
 
-  --s-todo: #78756d;
+  --s-todo: #7a7a7a;
   --s-progress: #dfaa5e;
   --s-ongoing: #a99ae8;
   --s-review: #86ade0;
@@ -154,18 +155,18 @@
   --shadow: 0 2px 4px -1px rgba(0, 0, 0, 0.35), 0 10px 24px -8px rgba(0, 0, 0, 0.5);
   --shadow-lg: 0 24px 60px -16px rgba(0, 0, 0, 0.7), 0 4px 12px -4px rgba(0, 0, 0, 0.4);
 
-  --on-ink: #141413;
+  --on-ink: #171717;
   --on-ok: #10261c;
   --ink-hover: #ffffff;
-  --ring: rgba(233, 231, 225, 0.12);
-  --selection: rgba(233, 231, 225, 0.18);
-  --topbar-bg: rgba(20, 20, 19, 0.8);
+  --ring: rgba(226, 226, 226, 0.12);
+  --selection: rgba(226, 226, 226, 0.18);
+  --topbar-bg: rgba(23, 23, 23, 0.82);
   --scrim: rgba(0, 0, 0, 0.55);
-  --ongoing-a: #1d1b25;
-  --ongoing-b: #1b1a22;
-  --glow-a: rgba(223, 170, 94, 0.06);
-  --glow-b: rgba(134, 173, 224, 0.06);
-  --brand-accent: #e6b467;
+  --ongoing-a: #1d1d21;
+  --ongoing-b: #1b1b1f;
+  --glow-a: rgba(255, 255, 255, 0.02);
+  --glow-b: rgba(255, 255, 255, 0.015);
+  --brand-accent: #ff5a4d;
   color-scheme: dark;
 }
 
@@ -813,19 +814,12 @@ textarea.field {
 }
 
 .brand-mark {
+  display: block;
+  flex-shrink: 0;
   width: 28px;
   height: 28px;
   border-radius: var(--r-sm);
-  background: var(--ink);
-  color: var(--on-ink);
-  display: grid;
-  place-items: center;
-  font-family: var(--font-serif-stack);
-  font-style: italic;
-  font-size: 15px;
-  line-height: 1;
-  letter-spacing: -0.02em;
-  padding: 0 1px 1px 0;
+  overflow: hidden;
   box-shadow: var(--shadow-sm);
 }
 
@@ -2097,9 +2091,12 @@ textarea.field {
 .auth-mark {
   width: 40px;
   height: 40px;
-  border-radius: var(--r-sm);
-  font-size: 21px;
+  border-radius: 8px;
   margin-bottom: 28px;
+}
+
+.splash .auth-mark {
+  margin: 0;
 }
 
 .auth-title {
@@ -3833,7 +3830,6 @@ textarea.field {
   .topbar-brand .brand-mark {
     width: 26px;
     height: 26px;
-    font-size: 13px;
   }
 
   .topbar-brand .brand-name {

@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+  <!-- Favicon: sama dengan public/brand/ai-mark-square.svg, tapi sudut dibulatkan dan huruf A sedikit lebih besar
+       supaya tetap terbaca di ukuran tab browser (16–32px). -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="120" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#E3101A" />
+      <stop offset="0.55" stop-color="#EF1A17" />
+      <stop offset="1" stop-color="#FF4F1F" />
+    </linearGradient>
+  </defs>
+  <rect width="120" height="120" rx="26" fill="url(#bg)" />
+  <path
+    fill="#FFFFFF"
+    fill-rule="evenodd"
+    transform="translate(60 60) scale(0.72) translate(-60 -60)"
+    d="M47 8H73L112 112H87A27 27 0 0 0 33 112H8ZM46 57A14 14 0 1 0 74 57A14 14 0 1 0 46 57Z"
+  />
+</svg>
