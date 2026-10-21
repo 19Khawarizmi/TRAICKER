@@ -69,6 +69,7 @@ function PlatformTag({ platform, format }) {
 }
 
 export default function ContentPlan({
+  active,
   clients, activeClients, activeClient, query, profiles, currentUserId, isAdmin, Avatar, profileOf, clientOf,
   todayStr, persist, onCounts, newTick, openPostRequest, platformDialogTick,
 }) {
@@ -224,13 +225,13 @@ export default function ContentPlan({
   // Esc menutup panel / dialog milik ruang kerja ini.
   useEffect(() => {
     function onKey(e) {
-      if (e.key !== "Escape" || e.defaultPrevented) return;
+      if (e.key !== "Escape" || e.defaultPrevented || !active) return;
       if (platformDialog) setPlatformDialog(false);
       else if (editing) setEditing(null);
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [platformDialog, editing]);
+  }, [platformDialog, editing, active]);
 
   function openNew(date) {
     const platform = activePlatforms[0];
@@ -318,6 +319,8 @@ export default function ContentPlan({
     setExporting(false);
   }
 
+  // Saat ruang kerja Project dibuka: tetap terpasang (data, realtime, angka sidebar jalan terus), tapi tidak digambar.
+  if (!active) return null;
   if (!loaded) return <div className="page-head"><span className="text-muted">Memuat content plan…</span></div>;
   if (loadError) {
     return (

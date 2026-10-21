@@ -802,8 +802,10 @@ export default function AgencyTracker() {
           </div>
         </header>
 
-        {workspace === "content" ? (
-          <ContentPlan
+        {/* Content plan selalu terpasang (datanya dimuat di latar sejak awal dan tetap tersimpan),
+            hanya disembunyikan saat ruang kerja Project dibuka. Jadi pindah tab terasa instan. */}
+        <ContentPlan
+            active={workspace === "content"}
             clients={clients}
             activeClients={activeClients}
             activeClient={activeClient}
@@ -821,7 +823,7 @@ export default function AgencyTracker() {
             openPostRequest={openPostReq}
             platformDialogTick={platformTick}
           />
-        ) : (
+        {workspace !== "content" && (
         <>
         {/* ---------- Judul + filter ---------- */}
         <section className="page-head">
