@@ -70,7 +70,7 @@ function PlatformTag({ platform, format }) {
 
 export default function ContentPlan({
   active,
-  clients, activeClients, activeClient, query, profiles, currentUserId, isAdmin, Avatar, profileOf, clientOf,
+  clients, activeClients, activeClient, query, profiles, currentUserId, isAdmin, canManage, jobTitleOf, Avatar, profileOf, clientOf,
   todayStr, persist, onCounts, newTick, openPostRequest, platformDialogTick,
 }) {
   const [platforms, setPlatforms] = useState([]);
@@ -170,7 +170,8 @@ export default function ContentPlan({
 
   const platformOf = (id) => platforms.find((p) => p.id === id) || null;
   const activePlatforms = platforms.filter((p) => !p.archived);
-  const canEditPost = (p) => isAdmin || (!!currentUserId && (p.specialist === currentUserId || p.designer === currentUserId));
+  // Admin & manager boleh mengedit dan menugaskan semua konten; member hanya konten yang dia pegang.
+  const canEditPost = (p) => canManage || (!!currentUserId && (p.specialist === currentUserId || p.designer === currentUserId));
   const canDeletePost = (p) => isAdmin || (!!currentUserId && p.createdBy === currentUserId);
   const archivedClientIds = new Set(clients.filter((c) => c.archived).map((c) => c.id));
 
@@ -254,8 +255,8 @@ export default function ContentPlan({
       status: "brief",
       approval: "none",
       approvalNote: "",
-      // Member yang membuat konten otomatis jadi sosmed specialist-nya; admin bebas memilih.
-      specialist: isAdmin ? null : currentUserId,
+      // Member yang membuat konten otomatis jadi sosmed specialist-nya; admin & manager bebas memilih.
+      specialist: canManage ? null : currentUserId,
       designer: null,
       createdBy: currentUserId,
       metrics: {},
@@ -341,6 +342,7 @@ export default function ContentPlan({
   const personOptions = profiles.map((p) => ({
     value: p.id,
     label: `${p.name}${p.id === currentUserId ? " (saya)" : ""}`,
+    description: jobTitleOf(p.jobTitleId) || undefined,
     leading: <Avatar profile={p} size={18} />,
     group: "Anggota",
   }));
@@ -496,7 +498,7 @@ export default function ContentPlan({
                   <th>Tahap</th>
                   <th>Approval</th>
                   <th>Sosmed</th>
-                  <th>Desainer</th>
+                  <th>Kreatif</th>
                   <th aria-label="Link visual" />
                 </tr>
               </thead>
@@ -574,6 +576,7 @@ export default function ContentPlan({
           personOptions={personOptions}
           currentUserId={currentUserId}
           isAdmin={isAdmin}
+          canManage={canManage}
           canEditPost={canEditPost}
           canDeletePost={canDeletePost}
           clientOf={clientOf}
@@ -780,14 +783,14 @@ function ContentCalendar({ posts, cursor, setCursor, todayStr, platformOf, clien
 // ---------------------------------------------------------------------------------------------
 // Panel detail konten
 
-function PostDrawer({ editing, setEditing, saved, clients, platforms, posts, personOptions, currentUserId, isAdmin, canEditPost, canDeletePost, clientOf, platformOf, profileOf, Avatar, onSave, onDelete }) {
+function PostDrawer({ editing, setEditing, saved, clients, platforms, posts, personOptions, currentUserId, isAdmin, canManage, canEditPost, canDeletePost, clientOf, platformOf, profileOf, Avatar, onSave, onDelete }) {
   const canEdit = editing.isNew || (!!saved && canEditPost(saved));
   const pf = platformOf(editing.platform);
   const set = (fields) => setEditing((prev) => ({ ...prev, ...fields }));
   const charCount = (editing.caption || "").length + (editing.hashtags ? editing.hashtags.length + 2 : 0);
   const overLimit = pf?.charLimit && charCount > pf.charLimit;
-  // Member wajib memegang konten yang dia buat/ubah (sesuai aturan database).
-  const holdsIt = isAdmin || editing.specialist === currentUserId || editing.designer === currentUserId;
+  // Member wajib memegang konten yang dia buat/ubah (sesuai aturan database). Admin & manager bebas.
+  const holdsIt = canManage || editing.specialist === currentUserId || editing.designer === currentUserId;
   const pillars = [...new Set(posts.map((p) => p.pillar).filter(Boolean))].sort();
   const stage = STAGE_BY_ID[editing.status];
 
@@ -809,7 +812,7 @@ function PostDrawer({ editing, setEditing, saved, clients, platforms, posts, per
           {!canEdit && (
             <div className="notice">
               <Icon name="lock" size={14} />
-              <span>Hanya bisa dilihat. Yang bisa mengubah konten ini: admin, sosmed specialist, dan desainernya.</span>
+              <span>Hanya bisa dilihat. Yang bisa mengubah konten ini: admin, manager, sosmed specialist, dan desainer/kreatifnya.</span>
             </div>
           )}
 
@@ -890,7 +893,7 @@ function PostDrawer({ editing, setEditing, saved, clients, platforms, posts, per
               />
             </div>
 
-            <div className="prop-label"><Icon name="edit" size={14} />Desainer</div>
+            <div className="prop-label"><Icon name="edit" size={14} />Kreatif</div>
             <div className="prop-value">
               {profileOf(editing.designer) ? <Avatar profile={profileOf(editing.designer)} size={22} /> : <span className="avatar" style={{ width: 22, height: 22, background: "var(--sunken)", color: "var(--faint)" }}><Icon name="user" size={12} /></span>}
               <Select
@@ -899,12 +902,12 @@ function PostDrawer({ editing, setEditing, saved, clients, platforms, posts, per
                 value={editing.designer || ""}
                 onChange={(v) => set({ designer: v || null })}
                 disabled={!canEdit}
-                ariaLabel="Desainer"
+                ariaLabel="Desainer / kreatif"
                 searchPlaceholder="Cari anggota…"
-                options={[{ value: "", label: "Belum ada desainer", leading: <EmptyAvatar /> }, ...personOptions]}
+                options={[{ value: "", label: "Belum ada desainer / kreatif", description: "Graphic designer, video editor, copywriter, dll.", leading: <EmptyAvatar /> }, ...personOptions]}
               />
             </div>
-            {canEdit && !holdsIt && <div className="prop-hint" style={{ color: "var(--danger)" }}>Pilih dirimu sebagai sosmed specialist atau desainer supaya bisa menyimpan.</div>}
+            {canEdit && !holdsIt && <div className="prop-hint" style={{ color: "var(--danger)" }}>Pilih dirimu sebagai sosmed specialist atau kreatif supaya bisa menyimpan.</div>}
 
             <div className="prop-label"><Icon name="link" size={14} />Visual</div>
             <div className="prop-value">

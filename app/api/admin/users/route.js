@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireAdmin, fail, mapAuthError, toMember, EMAIL_RE, MIN_PASSWORD } from "@/lib/adminServer";
+import { requireAdmin, fail, mapAuthError, toMember, parseRole, parseJobTitle, EMAIL_RE, MIN_PASSWORD, PROFILE_COLUMNS } from "@/lib/adminServer";
 
 // POST /api/admin/users — tambah anggota tim (hanya admin).
 
@@ -21,7 +21,9 @@ export async function POST(request) {
   const email = String(body.email || "").trim().toLowerCase();
   const password = String(body.password || "");
   const name = String(body.name || "").trim().slice(0, 60);
-  const role = body.role === "admin" ? "admin" : "member";
+  const role = parseRole(body.role);
+  const jobTitle = parseJobTitle(body.jobTitleId);
+  if (jobTitle.error) return fail(400, jobTitle.error);
 
   if (!EMAIL_RE.test(email)) return fail(400, "Format email tidak valid.");
   if (password.length < MIN_PASSWORD) return fail(400, `Password minimal ${MIN_PASSWORD} karakter.`);
@@ -37,9 +39,9 @@ export async function POST(request) {
   // Profil dibuat otomatis oleh trigger database; di sini set nama tampilan dan perannya.
   const { data: profile, error: profileError } = await admin
     .from("profiles")
-    .update({ display_name: name || email.split("@")[0], role })
+    .update({ display_name: name || email.split("@")[0], role, job_title_id: jobTitle.value })
     .eq("id", created.user.id)
-    .select("id, email, display_name, role")
+    .select(PROFILE_COLUMNS)
     .maybeSingle();
 
   if (profileError || !profile) {

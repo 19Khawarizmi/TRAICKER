@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { requireAdmin, fail, mapAuthError, toMember, countAdmins, EMAIL_RE, MIN_PASSWORD } from "@/lib/adminServer";
+import { requireAdmin, fail, mapAuthError, toMember, countAdmins, parseRole, parseJobTitle, EMAIL_RE, MIN_PASSWORD, UUID_RE, PROFILE_COLUMNS } from "@/lib/adminServer";
 
-// PATCH  /api/admin/users/:id — ubah nama, email, peran, atau password anggota (hanya admin).
+// PATCH  /api/admin/users/:id — ubah nama, email, peran, jabatan, atau password anggota (hanya admin).
 // DELETE /api/admin/users/:id — hapus akun anggota (hanya admin).
 // Pengaman: admin tidak bisa menghapus/menurunkan dirinya sendiri, dan admin terakhir tidak bisa
 // dihapus/diturunkan, supaya aplikasi tidak pernah kehilangan admin.
@@ -9,11 +9,9 @@ import { requireAdmin, fail, mapAuthError, toMember, countAdmins, EMAIL_RE, MIN_
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
 async function loadTarget(admin, id) {
   if (!UUID_RE.test(id)) return { error: fail(400, "ID anggota tidak valid.") };
-  const { data: profile } = await admin.from("profiles").select("id, email, display_name, role").eq("id", id).maybeSingle();
+  const { data: profile } = await admin.from("profiles").select(PROFILE_COLUMNS).eq("id", id).maybeSingle();
   if (!profile) return { error: fail(404, "Anggota tidak ditemukan.") };
   return { profile };
 }
@@ -60,7 +58,7 @@ export async function PATCH(request, { params }) {
   }
 
   if (body.role !== undefined) {
-    const role = body.role === "admin" ? "admin" : "member";
+    const role = parseRole(body.role);
     if (role !== current.role) {
       if (current.id === me.id) return fail(400, "Kamu tidak bisa menurunkan peranmu sendiri. Minta admin lain melakukannya.");
       if (current.role === "admin" && (await countAdmins(admin)) <= 1) {
@@ -68,6 +66,12 @@ export async function PATCH(request, { params }) {
       }
       profileUpdate.role = role;
     }
+  }
+
+  if (body.jobTitleId !== undefined) {
+    const jobTitle = parseJobTitle(body.jobTitleId);
+    if (jobTitle.error) return fail(400, jobTitle.error);
+    if (jobTitle.value !== (current.job_title_id || null)) profileUpdate.job_title_id = jobTitle.value;
   }
 
   if (Object.keys(authUpdate).length > 0) {
@@ -79,7 +83,7 @@ export async function PATCH(request, { params }) {
 
   let updated = current;
   if (Object.keys(profileUpdate).length > 0) {
-    const { data, error } = await admin.from("profiles").update(profileUpdate).eq("id", id).select("id, email, display_name, role").maybeSingle();
+    const { data, error } = await admin.from("profiles").update(profileUpdate).eq("id", id).select(PROFILE_COLUMNS).maybeSingle();
     if (error || !data) return fail(500, "Gagal menyimpan perubahan profil.");
     updated = data;
   }

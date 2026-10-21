@@ -42,7 +42,7 @@ function describe(item, { columnLabel, personName, clientName, platformName, app
     case "approval": return <>menandai approval: <b>{approvalLabel(m.to)}</b></>;
     case "schedule": return m.date ? <>menjadwalkan tayang ke <b>{fmtDay(m.date)}{m.time ? `, ${String(m.time).slice(0, 5)}` : ""}</b></> : "menghapus jadwal tayang";
     case "specialist": return m.to ? <>menugaskan sosmed specialist <b>{personName(m.to)}</b></> : "menghapus sosmed specialist";
-    case "designer": return m.to ? <>menugaskan desainer <b>{personName(m.to)}</b></> : "menghapus desainer";
+    case "designer": return m.to ? <>menugaskan desainer/kreatif <b>{personName(m.to)}</b></> : "menghapus desainer/kreatif";
     case "platform": return <>mengubah platform ke <b>{platformName(m.platform)}{m.format ? ` · ${m.format}` : ""}</b></>;
     case "metrics": return m.reach != null ? <>memperbarui metrik performa (reach <b>{Number(m.reach).toLocaleString("id-ID")}</b>)</> : "memperbarui metrik performa";
     case "subtask_added": return <>menambah subtask {q(m.text)}</>;

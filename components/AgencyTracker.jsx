@@ -16,6 +16,7 @@ import TimelineView from "@/components/TimelineView";
 import ContentPlan from "@/components/ContentPlan";
 import Select from "@/components/Select";
 import BrandMark from "@/components/BrandMark";
+import { ROLE_LABEL, canManageWork } from "@/lib/roles";
 
 const COLUMNS = [
   { id: "todo", label: "Perlu Dikerjakan", color: "var(--s-todo)", dot: "" },
@@ -140,6 +141,7 @@ export default function AgencyTracker() {
   const [tasks, setTasks] = useState([]);
   const [clients, setClients] = useState([]);
   const [profiles, setProfiles] = useState([]);
+  const [jobTitles, setJobTitles] = useState([]);
   const [currentUserId, setCurrentUserId] = useState(null);
   const [assigneeFilter, setAssigneeFilter] = useState("all"); // "all" | "me" | "none" | id profil
   const [loaded, setLoaded] = useState(false);
@@ -183,6 +185,7 @@ export default function AgencyTracker() {
       const board = await db.fetchBoard();
       setClients(board.clients);
       setProfiles(board.profiles);
+      setJobTitles(board.jobTitles);
       setCurrentUserId(board.currentUserId);
       setTasks(board.tasks);
       setLoadError("");
@@ -240,6 +243,7 @@ export default function AgencyTracker() {
       .on("postgres_changes", { event: "*", schema: "public", table: "subtasks" }, schedule)
       .on("postgres_changes", { event: "*", schema: "public", table: "clients" }, schedule)
       .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, schedule)
+      .on("postgres_changes", { event: "*", schema: "public", table: "job_titles" }, schedule)
       .subscribe();
     return () => {
       clearTimeout(timer);
@@ -335,7 +339,11 @@ export default function AgencyTracker() {
   // Hak akses — cerminan aturan RLS di database (yang tetap jadi penjaga utama).
   const me = profileOf(currentUserId);
   const isAdmin = me?.role === "admin";
-  const canEditTask = (t) => isAdmin || (!!currentUserId && t.assignee === currentUserId);
+  // Admin & manager boleh membuat, mengedit, dan menugaskan semua pekerjaan.
+  const canManage = canManageWork(me?.role);
+  const jobTitleOf = (id) => jobTitles.find((j) => j.id === id)?.name || "";
+  const roleLine = (p) => (p ? [ROLE_LABEL[p.role] || "Member", jobTitleOf(p.jobTitleId)].filter(Boolean).join(" · ") : "");
+  const canEditTask = (t) => canManage || (!!currentUserId && t.assignee === currentUserId);
   const canDeleteTask = (t) => isAdmin || (!!currentUserId && t.createdBy === currentUserId);
   const canWorkOnSubtask = (t, s) => canEditTask(t) || (!!currentUserId && s.assignee === currentUserId);
 
@@ -461,7 +469,7 @@ export default function AgencyTracker() {
     // ID dibuat di client supaya lampiran bisa langsung di-upload sebelum tugas disimpan.
     // Member yang membuat tugas otomatis jadi assignee-nya; admin bebas memilih.
     editBaseRef.current = null;
-    setEditing({ id: crypto.randomUUID(), isNew: true, title: "", client: activeClients[0]?.id, assignee: isAdmin ? null : currentUserId, createdBy: currentUserId, priority: "Sedang", due: todayStr, start: "", column: "todo", subtasks: [] });
+    setEditing({ id: crypto.randomUUID(), isNew: true, title: "", client: activeClients[0]?.id, assignee: canManage ? null : currentUserId, createdBy: currentUserId, priority: "Sedang", due: todayStr, start: "", column: "todo", subtasks: [] });
     setNewSubtask("");
     setExpandedSubtask(null);
     setModalOpen(true);
@@ -648,6 +656,7 @@ export default function AgencyTracker() {
   const personOptions = profiles.map((p) => ({
     value: p.id,
     label: `${p.name}${p.id === currentUserId ? " (saya)" : ""}`,
+    description: jobTitleOf(p.jobTitleId) || undefined,
     leading: <Avatar profile={p} size={18} />,
     group: "Anggota",
   }));
@@ -759,7 +768,7 @@ export default function AgencyTracker() {
               {me ? <Avatar profile={me} size={30} /> : <span className="avatar" style={{ width: 30, height: 30, background: "var(--sunken)" }} />}
               <span className="user-chip-text">
                 <span className="user-chip-name">{me?.name || "Akun"}</span>
-                <span className={`user-chip-role ${isAdmin ? "is-admin" : ""}`}>{isAdmin ? "Admin" : "Member"}</span>
+                <span className={`user-chip-role is-${me?.role || "member"}`}>{ROLE_LABEL[me?.role] || "Member"}</span>
               </span>
               <Icon name="chevronDown" size={14} style={{ color: "var(--muted)" }} />
             </button>
@@ -772,7 +781,7 @@ export default function AgencyTracker() {
                     <div style={{ minWidth: 0 }}>
                       <div className="account-name">{me?.name}</div>
                       <div className="account-email">{me?.email}</div>
-                      <span className={`role-badge ${isAdmin ? "is-admin" : ""}`}>{isAdmin ? "Admin" : "Member"}</span>
+                      <span className={`role-badge is-${me?.role || "member"}`}>{roleLine(me)}</span>
                     </div>
                   </div>
                   <div className="popover-label" style={{ paddingTop: 4 }}>Tampilan</div>
@@ -813,6 +822,8 @@ export default function AgencyTracker() {
             profiles={profiles}
             currentUserId={currentUserId}
             isAdmin={isAdmin}
+            canManage={canManage}
+            jobTitleOf={jobTitleOf}
             Avatar={Avatar}
             profileOf={profileOf}
             clientOf={clientOf}
@@ -1005,7 +1016,7 @@ export default function AgencyTracker() {
                         <article
                           className={`card ${draggable ? "is-draggable" : ""} ${dragId === t.id ? "is-dragging" : ""} ${selected ? "is-selected" : ""} ${isDone ? "is-done" : ""}`}
                           draggable={draggable}
-                          title={draggable ? undefined : "Hanya admin atau orang yang ditugaskan yang bisa memindahkan tugas ini"}
+                          title={draggable ? undefined : "Hanya admin, manager, atau orang yang ditugaskan yang bisa memindahkan tugas ini"}
                           onDragStart={(e) => {
                             e.dataTransfer.effectAllowed = "move";
                             e.dataTransfer.setData("text/plain", t.id);
@@ -1103,6 +1114,9 @@ export default function AgencyTracker() {
       {teamOpen && isAdmin && (
         <TeamDialog
           profiles={profiles}
+          jobTitles={jobTitles}
+          onJobTitlesChange={setJobTitles}
+          persist={persist}
           currentUserId={currentUserId}
           Avatar={Avatar}
           onClose={() => setTeamOpen(false)}
@@ -1262,7 +1276,7 @@ export default function AgencyTracker() {
                   <span>
                     {modalHasOwnSubtasks
                       ? "Tugas ini bukan milikmu. Kamu bisa mengubah status, link, catatan, dan lampiran di subtask yang ditugaskan ke kamu."
-                      : "Hanya bisa dilihat. Yang bisa mengubah tugas ini: admin dan orang yang ditugaskan."}
+                      : "Hanya bisa dilihat. Yang bisa mengubah tugas ini: admin, manager, dan orang yang ditugaskan."}
                   </span>
                 </div>
               )}
@@ -1320,8 +1334,8 @@ export default function AgencyTracker() {
                     triggerLeading={false}
                     value={editing.assignee || ""}
                     onChange={(v) => setEditing({ ...editing, assignee: v || null })}
-                    disabled={!isAdmin}
-                    title={isAdmin ? undefined : "Hanya admin yang bisa mengubah penugasan"}
+                    disabled={!canManage}
+                    title={canManage ? undefined : "Hanya admin dan manager yang bisa mengubah penugasan"}
                     ariaLabel="Ditugaskan ke"
                     searchPlaceholder="Cari anggota…"
                     options={[unassignedOption("Belum ditugaskan"), ...personOptions]}

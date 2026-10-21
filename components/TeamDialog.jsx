@@ -4,9 +4,11 @@ import { useState } from "react";
 import Icon from "@/components/icons";
 import Select from "@/components/Select";
 import * as db from "@/lib/trackerData";
+import { ROLES, ROLE_LABEL, ROLE_DESCRIPTION } from "@/lib/roles";
 
 // Kelola anggota tim (hanya admin). Semua aksi dicek ulang di server (/api/admin/users),
 // tombol yang dikunci di sini hanya untuk kenyamanan.
+// Peran = hak akses (Admin / Manager / Member). Jabatan = label saja (dikelola di bagian bawah dialog).
 
 // Password acak yang mudah dibaca (tanpa karakter mirip seperti O/0, l/1).
 function generatePassword(length = 12) {
@@ -22,7 +24,7 @@ function generatePassword(length = 12) {
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const EMPTY = { name: "", email: "", password: "", role: "member" };
+const EMPTY = { name: "", email: "", password: "", role: "member", jobTitleId: null };
 
 function PasswordField({ value, onChange, placeholder }) {
   const [show, setShow] = useState(false);
@@ -56,10 +58,14 @@ function PasswordField({ value, onChange, placeholder }) {
   );
 }
 
-const ROLE_OPTIONS = [
-  { value: "member", label: "Member", description: "Mengerjakan tugas yang ditugaskan ke dirinya", leading: <Icon name="user" size={14} /> },
-  { value: "admin", label: "Admin", description: "Akses penuh, termasuk kelola klien & anggota", leading: <Icon name="lock" size={14} /> },
-];
+const ROLE_ICON = { member: "user", manager: "eye", admin: "lock" };
+const ROLE_ORDER = { admin: 0, manager: 1, member: 2 };
+const ROLE_OPTIONS = [...ROLES].reverse().map((r) => ({
+  value: r,
+  label: ROLE_LABEL[r],
+  description: ROLE_DESCRIPTION[r],
+  leading: <Icon name={ROLE_ICON[r]} size={14} />,
+}));
 
 function RoleSelect({ value, onChange, disabled, title }) {
   return (
@@ -74,6 +80,19 @@ function RoleSelect({ value, onChange, disabled, title }) {
   );
 }
 
+function JobTitleSelect({ value, onChange, jobTitles, disabled }) {
+  return (
+    <Select
+      value={value || ""}
+      onChange={(v) => onChange(v || null)}
+      disabled={disabled}
+      ariaLabel="Jabatan"
+      searchPlaceholder="Cari jabatan…"
+      options={[{ value: "", label: "Tanpa jabatan" }, ...jobTitles.map((j) => ({ value: j.id, label: j.name }))]}
+    />
+  );
+}
+
 function ErrorBox({ message }) {
   if (!message) return null;
   return (
@@ -84,7 +103,7 @@ function ErrorBox({ message }) {
   );
 }
 
-export default function TeamDialog({ profiles, currentUserId, Avatar, onClose, onCreated, onUpdated, onRemoved }) {
+export default function TeamDialog({ profiles, jobTitles, onJobTitlesChange, persist, currentUserId, Avatar, onClose, onCreated, onUpdated, onRemoved }) {
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -117,7 +136,7 @@ export default function TeamDialog({ profiles, currentUserId, Avatar, onClose, o
 
   function startEdit(p) {
     setEditingId(p.id);
-    setEditForm({ name: p.name, email: p.email, role: p.role, password: "" });
+    setEditForm({ name: p.name, email: p.email, role: p.role, jobTitleId: p.jobTitleId || null, password: "" });
     setRowError({ id: null, message: "" });
   }
 
@@ -126,6 +145,7 @@ export default function TeamDialog({ profiles, currentUserId, Avatar, onClose, o
     if (editForm.name.trim() !== p.name) changes.name = editForm.name.trim();
     if (editForm.email.trim().toLowerCase() !== p.email) changes.email = editForm.email.trim();
     if (editForm.role !== p.role) changes.role = editForm.role;
+    if ((editForm.jobTitleId || null) !== (p.jobTitleId || null)) changes.jobTitleId = editForm.jobTitleId || null;
     if (editForm.password) changes.password = editForm.password;
     if (Object.keys(changes).length === 0) {
       setEditingId(null);
@@ -172,7 +192,48 @@ export default function TeamDialog({ profiles, currentUserId, Avatar, onClose, o
     }
   }
 
-  const sorted = [...profiles].sort((a, b) => (a.role === b.role ? a.name.localeCompare(b.name) : a.role === "admin" ? -1 : 1));
+  const sorted = [...profiles].sort((a, b) => (ROLE_ORDER[a.role] ?? 2) - (ROLE_ORDER[b.role] ?? 2) || a.name.localeCompare(b.name));
+  const jobTitleOf = (id) => jobTitles.find((j) => j.id === id)?.name || "";
+
+  // ---- Jabatan ----
+  const [newJob, setNewJob] = useState("");
+  const [jobEdit, setJobEdit] = useState({ id: null, name: "" });
+  const [jobError, setJobError] = useState("");
+  const jobNameTaken = (name, exceptId) => jobTitles.some((j) => j.id !== exceptId && j.name.trim().toLowerCase() === name.trim().toLowerCase());
+
+  async function addJob(e) {
+    e.preventDefault();
+    const name = newJob.trim();
+    if (!name) return;
+    if (jobNameTaken(name)) return setJobError("Jabatan dengan nama ini sudah ada.");
+    setJobError("");
+    try {
+      const created = await db.createJobTitle(name, jobTitles.reduce((m, j) => Math.max(m, j.sortOrder || 0), 0) + 1);
+      onJobTitlesChange((prev) => [...prev, created]);
+      setNewJob("");
+    } catch (err) {
+      setJobError(err.message);
+    }
+  }
+
+  function saveJob() {
+    const name = jobEdit.name.trim();
+    const current = jobTitles.find((j) => j.id === jobEdit.id);
+    if (!name || !current || name === current.name) return setJobEdit({ id: null, name: "" });
+    if (jobNameTaken(name, jobEdit.id)) return setJobError("Jabatan dengan nama ini sudah ada.");
+    setJobError("");
+    onJobTitlesChange((prev) => prev.map((j) => (j.id === jobEdit.id ? { ...j, name } : j)));
+    persist(() => db.renameJobTitle(jobEdit.id, name));
+    setJobEdit({ id: null, name: "" });
+  }
+
+  function removeJob(j) {
+    const used = profiles.filter((p) => p.jobTitleId === j.id).length;
+    const ok = window.confirm(used ? `Hapus jabatan "${j.name}"? ${used} anggota yang memakainya akan jadi tanpa jabatan.` : `Hapus jabatan "${j.name}"?`);
+    if (!ok) return;
+    onJobTitlesChange((prev) => prev.filter((x) => x.id !== j.id));
+    persist(() => db.deleteJobTitle(j.id));
+  }
 
   return (
     <>
@@ -197,7 +258,7 @@ export default function TeamDialog({ profiles, currentUserId, Avatar, onClose, o
                     <Icon name="check" size={12} /> {credentials.kind === "created" ? "Akun dibuat" : "Password diganti"}
                   </span>
                   <span className="text-muted">
-                    {credentials.user.name} · {credentials.user.role === "admin" ? "Admin" : "Member"}
+                    {credentials.user.name} · {ROLE_LABEL[credentials.user.role] || "Member"}
                   </span>
                 </div>
                 <div className="mono" style={{ fontSize: 12.5, lineHeight: 1.7, padding: "10px 12px", border: "1px solid var(--line)", borderRadius: "var(--r-sm)", background: "var(--surface)", userSelect: "all", wordBreak: "break-all" }}>
@@ -234,10 +295,16 @@ export default function TeamDialog({ profiles, currentUserId, Avatar, onClose, o
                   Password awal
                   <PasswordField value={form.password} onChange={(password) => setForm({ ...form, password })} placeholder="Minimal 8 karakter" />
                 </label>
-                <label className="label">
-                  Peran
-                  <RoleSelect value={form.role} onChange={(role) => setForm({ ...form, role })} />
-                </label>
+                <div className="form-grid" style={{ gridTemplateColumns: "1fr 1fr" }}>
+                  <label className="label">
+                    Peran
+                    <RoleSelect value={form.role} onChange={(role) => setForm({ ...form, role })} />
+                  </label>
+                  <label className="label">
+                    Jabatan
+                    <JobTitleSelect value={form.jobTitleId} onChange={(jobTitleId) => setForm({ ...form, jobTitleId })} jobTitles={jobTitles} />
+                  </label>
+                </div>
                 <ErrorBox message={error} />
                 <div style={{ display: "flex", justifyContent: "flex-end" }}>
                   <button type="submit" className="btn btn-primary" disabled={!addValid || saving}>
@@ -268,10 +335,10 @@ export default function TeamDialog({ profiles, currentUserId, Avatar, onClose, o
                         {p.name}
                         {isSelf && <span className="text-muted"> (kamu)</span>}
                       </div>
-                      <div className="sub">{p.email}</div>
+                      <div className="sub">{[jobTitleOf(p.jobTitleId), p.email].filter(Boolean).join(" · ")}</div>
                     </div>
-                    <span className={`role-badge ${p.role === "admin" ? "is-admin" : ""}`} style={{ marginTop: 0 }}>
-                      {p.role === "admin" ? "Admin" : "Member"}
+                    <span className={`role-badge is-${p.role}`} style={{ marginTop: 0 }}>
+                      {ROLE_LABEL[p.role] || "Member"}
                     </span>
                     <button
                       className="btn btn-ghost btn-icon"
@@ -305,15 +372,21 @@ export default function TeamDialog({ profiles, currentUserId, Avatar, onClose, o
                           <input className="field" type="email" value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} autoComplete="off" />
                         </label>
                       </div>
-                      <label className="label">
-                        Peran
-                        <RoleSelect
-                          value={editForm.role}
-                          onChange={(role) => setEditForm({ ...editForm, role })}
-                          disabled={p.role === "admin" && (isSelf || isLastAdmin)}
-                          title={p.role === "admin" && lockReason ? `${lockReason} — peran tidak bisa diturunkan` : undefined}
-                        />
-                      </label>
+                      <div className="form-grid" style={{ gridTemplateColumns: "1fr 1fr" }}>
+                        <label className="label">
+                          Peran
+                          <RoleSelect
+                            value={editForm.role}
+                            onChange={(role) => setEditForm({ ...editForm, role })}
+                            disabled={p.role === "admin" && (isSelf || isLastAdmin)}
+                            title={p.role === "admin" && lockReason ? `${lockReason} — peran tidak bisa diturunkan` : undefined}
+                          />
+                        </label>
+                        <label className="label">
+                          Jabatan
+                          <JobTitleSelect value={editForm.jobTitleId} onChange={(jobTitleId) => setEditForm({ ...editForm, jobTitleId })} jobTitles={jobTitles} />
+                        </label>
+                      </div>
                       <label className="label">
                         Password baru <span className="text-muted" style={{ fontWeight: 400 }}>(kosongkan kalau tidak diganti)</span>
                         <PasswordField value={editForm.password} onChange={(password) => setEditForm({ ...editForm, password })} placeholder="Minimal 8 karakter" />
@@ -342,6 +415,50 @@ export default function TeamDialog({ profiles, currentUserId, Avatar, onClose, o
                 </div>
               );
             })}
+
+            <div className="list-label" style={{ marginTop: 22 }}>
+              <span>Jabatan</span>
+              <span className="mono">{jobTitles.length}</span>
+            </div>
+            <p className="text-muted" style={{ margin: "0 0 8px", fontSize: 12.5, lineHeight: 1.5 }}>
+              Jabatan hanya label yang tampil di nama anggota. Hak akses tetap mengikuti peran (Admin, Manager, atau Member).
+            </p>
+            {jobTitles.map((j) => {
+              const used = profiles.filter((p) => p.jobTitleId === j.id).length;
+              const editingJob = jobEdit.id === j.id;
+              return (
+                <div key={j.id} className="job-row">
+                  {editingJob ? (
+                    <input
+                      className="field"
+                      value={jobEdit.name}
+                      onChange={(e) => setJobEdit({ id: j.id, name: e.target.value })}
+                      onKeyDown={(e) => { if (e.key === "Enter") saveJob(); if (e.key === "Escape") { e.preventDefault(); setJobEdit({ id: null, name: "" }); } }}
+                      maxLength={40}
+                      autoFocus
+                      aria-label={`Nama jabatan ${j.name}`}
+                    />
+                  ) : (
+                    <span className="name">{j.name}</span>
+                  )}
+                  {!editingJob && <span className="count">{used} orang</span>}
+                  {editingJob ? (
+                    <button className="btn btn-ghost btn-icon btn-sm" onClick={saveJob} aria-label="Simpan nama jabatan" title="Simpan"><Icon name="check" size={14} /></button>
+                  ) : (
+                    <button className="btn btn-ghost btn-icon btn-sm" onClick={() => { setJobEdit({ id: j.id, name: j.name }); setJobError(""); }} aria-label={`Ganti nama ${j.name}`} title="Ganti nama"><Icon name="edit" size={14} /></button>
+                  )}
+                  <button className="btn btn-danger-ghost btn-icon btn-sm" onClick={() => removeJob(j)} aria-label={`Hapus jabatan ${j.name}`} title="Hapus"><Icon name="trash" size={14} /></button>
+                </div>
+              );
+            })}
+            <form className="job-add" onSubmit={addJob}>
+              <input className="field" value={newJob} onChange={(e) => { setNewJob(e.target.value); setJobError(""); }} placeholder="Jabatan baru, mis. Content Strategist" maxLength={40} aria-label="Nama jabatan baru" />
+              <button type="submit" className="btn btn-secondary" disabled={!newJob.trim()}>
+                <Icon name="plus" size={13} />
+                Tambah
+              </button>
+            </form>
+            {jobError && <div style={{ marginTop: 8 }}><ErrorBox message={jobError} /></div>}
           </div>
         </div>
       </div>

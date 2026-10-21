@@ -1014,6 +1014,11 @@ textarea.field {
   font-weight: 500;
 }
 
+.user-chip-role.is-manager {
+  color: var(--info);
+  font-weight: 500;
+}
+
 /* ---------- Judul halaman ---------- */
 
 .page-head {
@@ -2064,6 +2069,50 @@ textarea.field {
 .role-badge.is-admin {
   background: var(--ok-bg);
   color: var(--ok);
+}
+
+.role-badge.is-manager {
+  background: var(--info-bg);
+  color: var(--info);
+}
+
+/* Daftar jabatan di Kelola anggota */
+.job-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 4px 6px 10px;
+  border-radius: var(--r-sm);
+}
+
+.job-row:hover {
+  background: var(--surface-2);
+}
+
+.job-row .name {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.job-row .count {
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.job-row .field {
+  flex: 1;
+  height: 30px;
+}
+
+.job-add {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
 }
 
 /* ---------- Layar login & status ---------- */
