@@ -14,6 +14,7 @@ import TaskFeed from "@/components/TaskFeed";
 import CalendarView from "@/components/CalendarView";
 import TimelineView from "@/components/TimelineView";
 import ContentPlan from "@/components/ContentPlan";
+import WorkloadView from "@/components/WorkloadView";
 import Select from "@/components/Select";
 import BrandMark from "@/components/BrandMark";
 import { ROLE_LABEL, canManageWork } from "@/lib/roles";
@@ -160,9 +161,11 @@ export default function AgencyTracker() {
   const [passwordOpen, setPasswordOpen] = useState(false);
   const [attentionOpen, setAttentionOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false); // sidebar geser di tablet & HP
-  // Dua ruang kerja: "project" (tracker tugas non-sosmed) dan "content" (content plan sosmed).
+  // Ruang kerja: "project" (tracker tugas non-sosmed), "content" (content plan sosmed),
+  // dan "workload" (beban kerja tim, gabungan keduanya).
   const [workspace, setWorkspace] = useState("project");
   const [contentCounts, setContentCounts] = useState({});
+  const [contentData, setContentData] = useState({ posts: [], platforms: [] });
   const [contentNewTick, setContentNewTick] = useState(0);
   const [platformTick, setPlatformTick] = useState(0);
   const [openPostReq, setOpenPostReq] = useState(null);
@@ -201,7 +204,8 @@ export default function AgencyTracker() {
     try {
       const saved = localStorage.getItem("traicker:view");
       if (saved === "calendar" || saved === "timeline") setView(saved);
-      if (localStorage.getItem("traicker:workspace") === "content") setWorkspace("content");
+      const savedWorkspace = localStorage.getItem("traicker:workspace");
+      if (savedWorkspace === "content" || savedWorkspace === "workload") setWorkspace(savedWorkspace);
     } catch {}
   }, []);
 
@@ -687,6 +691,10 @@ export default function AgencyTracker() {
         </div>
 
         <nav>
+          <button className={`nav-item nav-workload ${workspace === "workload" ? "is-active" : ""}`} onClick={() => changeWorkspace("workload")}>
+            <Icon name="users" size={15} />
+            <span className="nav-text">Beban kerja tim</span>
+          </button>
           <button className={`nav-item ${activeClient === "all" ? "is-active" : ""}`} onClick={() => { setActiveClient("all"); setNavOpen(false); }}>
             <Icon name="folder" size={15} />
             <span className="nav-text">Semua klien</span>
@@ -736,7 +744,7 @@ export default function AgencyTracker() {
           </div>
           <label className="search">
             <Icon name="search" size={14} />
-            <input className="field" value={query} onChange={(e) => setQuery(e.target.value)} placeholder={workspace === "content" ? "Cari konten…" : "Cari tugas…"} aria-label={workspace === "content" ? "Cari konten" : "Cari tugas"} />
+            <input className="field" value={query} onChange={(e) => setQuery(e.target.value)} placeholder={workspace === "content" ? "Cari konten…" : workspace === "workload" ? "Cari anggota…" : "Cari tugas…"} aria-label={workspace === "content" ? "Cari konten" : workspace === "workload" ? "Cari anggota" : "Cari tugas"} />
           </label>
           <div className="topbar-spacer" />
           {saveLabel && (
@@ -830,11 +838,28 @@ export default function AgencyTracker() {
             todayStr={todayStr}
             persist={persist}
             onCounts={setContentCounts}
+            onData={setContentData}
             newTick={contentNewTick}
             openPostRequest={openPostReq}
             platformDialogTick={platformTick}
           />
-        {workspace !== "content" && (
+        {workspace === "workload" && (
+          <WorkloadView
+            profiles={profiles}
+            tasks={boardTasks.filter((t) => activeClient === "all" || t.client === activeClient)}
+            posts={contentData.posts.filter((p) => !archivedClientIds.has(p.client) && (activeClient === "all" || p.client === activeClient))}
+            todayStr={todayStr}
+            query={query}
+            currentUserId={currentUserId}
+            clientOf={clientOf}
+            jobTitleOf={jobTitleOf}
+            Avatar={Avatar}
+            onOpenTask={openEdit}
+            onOpenPost={(p) => { changeWorkspace("content"); setOpenPostReq({ id: p.id, at: Date.now() }); }}
+          />
+        )}
+
+        {workspace === "project" && (
         <>
         {/* ---------- Judul + filter ---------- */}
         <section className="page-head">

@@ -71,7 +71,7 @@ function PlatformTag({ platform, format }) {
 export default function ContentPlan({
   active,
   clients, activeClients, activeClient, query, profiles, currentUserId, isAdmin, canManage, jobTitleOf, Avatar, profileOf, clientOf,
-  todayStr, persist, onCounts, newTick, openPostRequest, platformDialogTick,
+  todayStr, persist, onCounts, onData, newTick, openPostRequest, platformDialogTick,
 }) {
   const [platforms, setPlatforms] = useState([]);
   const [posts, setPosts] = useState([]);
@@ -199,6 +199,12 @@ export default function ContentPlan({
     onCounts(counts);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [countsKey]);
+
+  // Data konten juga dipakai halaman Beban kerja tim.
+  useEffect(() => {
+    onData?.({ posts, platforms });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [posts, platforms]);
 
   // Tombol "Konten baru" di topbar.
   const firstTick = useRef(newTick);
