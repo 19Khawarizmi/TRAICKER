@@ -13,6 +13,7 @@ import NotificationBell from "@/components/NotificationBell";
 import TaskFeed from "@/components/TaskFeed";
 import CalendarView from "@/components/CalendarView";
 import TimelineView from "@/components/TimelineView";
+import ContentPlan from "@/components/ContentPlan";
 
 const COLUMNS = [
   { id: "todo", label: "Perlu Dikerjakan", color: "var(--s-todo)", dot: "" },
@@ -145,6 +146,12 @@ export default function AgencyTracker() {
   const [passwordOpen, setPasswordOpen] = useState(false);
   const [attentionOpen, setAttentionOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false); // sidebar geser di tablet & HP
+  // Dua ruang kerja: "project" (tracker tugas non-sosmed) dan "content" (content plan sosmed).
+  const [workspace, setWorkspace] = useState("project");
+  const [contentCounts, setContentCounts] = useState({});
+  const [contentNewTick, setContentNewTick] = useState(0);
+  const [platformTick, setPlatformTick] = useState(0);
+  const [openPostReq, setOpenPostReq] = useState(null);
   const { theme, resolved: resolvedTheme, setTheme } = useTheme();
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -177,8 +184,17 @@ export default function AgencyTracker() {
     try {
       const saved = localStorage.getItem("traicker:view");
       if (saved === "calendar" || saved === "timeline") setView(saved);
+      if (localStorage.getItem("traicker:workspace") === "content") setWorkspace("content");
     } catch {}
   }, []);
+
+  function changeWorkspace(next) {
+    setWorkspace(next);
+    setNavOpen(false);
+    try {
+      localStorage.setItem("traicker:workspace", next);
+    } catch {}
+  }
 
   function changeView(next) {
     setView(next);
@@ -452,10 +468,18 @@ export default function AgencyTracker() {
     persist(() => db.moveTask(task.id, column, position));
   }
 
-  // Dari notifikasi: buka detail tugas berdasarkan id (kalau masih ada).
-  function openTaskById(id) {
-    const task = tasks.find((t) => t.id === id);
-    if (task) openEdit(task);
+  // Dari notifikasi: buka tugas (ruang kerja Project) atau konten (ruang kerja Content plan).
+  function openFromNotification(n) {
+    if (n.postId) {
+      changeWorkspace("content");
+      setOpenPostReq({ id: n.postId, at: Date.now() });
+      return;
+    }
+    const task = tasks.find((t) => t.id === n.taskId);
+    if (task) {
+      changeWorkspace("project");
+      openEdit(task);
+    }
   }
 
   // Dari kalender: geser tugas ke tanggal lain = ganti deadline.
@@ -602,18 +626,29 @@ export default function AgencyTracker() {
           </button>
         </div>
 
+        <div className="segmented workspace-switch" role="tablist" aria-label="Ruang kerja">
+          <button role="tab" aria-selected={workspace === "project"} className={workspace === "project" ? "is-active" : ""} onClick={() => changeWorkspace("project")}>
+            <Icon name="columns" size={13} />
+            Project
+          </button>
+          <button role="tab" aria-selected={workspace === "content"} className={workspace === "content" ? "is-active" : ""} onClick={() => changeWorkspace("content")}>
+            <Icon name="calendar" size={13} />
+            Content plan
+          </button>
+        </div>
+
         <nav>
           <button className={`nav-item ${activeClient === "all" ? "is-active" : ""}`} onClick={() => { setActiveClient("all"); setNavOpen(false); }}>
             <Icon name="folder" size={15} />
             <span className="nav-text">Semua klien</span>
-            <span className="nav-count">{boardTasks.filter((t) => t.column !== "done").length}</span>
+            <span className="nav-count">{workspace === "content" ? Object.entries(contentCounts).filter(([id]) => !archivedClientIds.has(id)).reduce((s, [, n]) => s + n, 0) : boardTasks.filter((t) => t.column !== "done").length}</span>
           </button>
           <div className="nav-label">Klien</div>
           {activeClients.map((c) => (
             <button key={c.id} className={`nav-item ${activeClient === c.id ? "is-active" : ""}`} onClick={() => { setActiveClient(c.id); setNavOpen(false); }} title={c.name}>
               <span className="dot" style={{ background: c.color }} />
               <span className="nav-text">{c.short}</span>
-              <span className="nav-count">{counts[c.id] || ""}</span>
+              <span className="nav-count">{(workspace === "content" ? contentCounts[c.id] : counts[c.id]) || ""}</span>
             </button>
           ))}
         </nav>
@@ -625,6 +660,12 @@ export default function AgencyTracker() {
               <span className="nav-text">Anggota tim</span>
               <span className="nav-count">{profiles.length}</span>
             </button>
+            {workspace === "content" && (
+              <button className="nav-item" onClick={() => { setPlatformTick((t) => t + 1); setNavOpen(false); }}>
+                <Icon name="settings" size={15} />
+                <span className="nav-text">Kelola platform</span>
+              </button>
+            )}
             <button className="nav-item" onClick={() => { openClientModal(); setNavOpen(false); }}>
               <Icon name="settings" size={15} />
               <span className="nav-text">Kelola klien</span>
@@ -646,7 +687,7 @@ export default function AgencyTracker() {
           </div>
           <label className="search">
             <Icon name="search" size={14} />
-            <input className="field" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Cari tugas…" aria-label="Cari tugas" />
+            <input className="field" value={query} onChange={(e) => setQuery(e.target.value)} placeholder={workspace === "content" ? "Cari konten…" : "Cari tugas…"} aria-label={workspace === "content" ? "Cari konten" : "Cari tugas"} />
           </label>
           <div className="topbar-spacer" />
           {saveLabel && (
@@ -656,12 +697,12 @@ export default function AgencyTracker() {
             </span>
           )}
           {/* Di HP tombol ini menjadi tombol bulat melayang di kanan bawah (lihat .btn-new di CSS). */}
-          <button className="btn btn-primary btn-new" onClick={openNew} aria-label="Tugas baru">
+          <button className="btn btn-primary btn-new" onClick={workspace === "content" ? () => setContentNewTick((t) => t + 1) : openNew} aria-label={workspace === "content" ? "Konten baru" : "Tugas baru"}>
             <Icon name="plus" size={14} />
-            <span className="btn-new-label">Tugas baru</span>
+            <span className="btn-new-label">{workspace === "content" ? "Konten baru" : "Tugas baru"}</span>
           </button>
 
-          <NotificationBell userId={currentUserId} profileOf={profileOf} Avatar={Avatar} onOpenTask={openTaskById} />
+          <NotificationBell userId={currentUserId} profileOf={profileOf} Avatar={Avatar} onOpenTask={openFromNotification} />
 
           <button
             className="btn btn-ghost btn-icon"
@@ -721,6 +762,27 @@ export default function AgencyTracker() {
           </div>
         </header>
 
+        {workspace === "content" ? (
+          <ContentPlan
+            clients={clients}
+            activeClients={activeClients}
+            activeClient={activeClient}
+            query={query}
+            profiles={profiles}
+            currentUserId={currentUserId}
+            isAdmin={isAdmin}
+            Avatar={Avatar}
+            profileOf={profileOf}
+            clientOf={clientOf}
+            todayStr={todayStr}
+            persist={persist}
+            onCounts={setContentCounts}
+            newTick={contentNewTick}
+            openPostRequest={openPostReq}
+            platformDialogTick={platformTick}
+          />
+        ) : (
+        <>
         {/* ---------- Judul + filter ---------- */}
         <section className="page-head">
           <div>
@@ -976,6 +1038,8 @@ export default function AgencyTracker() {
             );
           })}
         </div>
+        )}
+        </>
         )}
       </div>
 

@@ -2680,6 +2680,283 @@ select.field:disabled {
 }
 
 
+
+/* ==========================================================================
+   Ruang kerja Content plan
+   ========================================================================== */
+
+/* Pemilih ruang kerja di sidebar */
+.workspace-switch {
+  margin: 0 2px 14px;
+}
+
+.workspace-switch button {
+  height: 32px;
+  font-size: 12.5px;
+}
+
+.kicker-ws {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* Label platform: badge berwarna + format */
+.pf-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 11.5px;
+  color: var(--ink-2);
+}
+
+.pf-badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 24px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: var(--pf);
+  color: #fff;
+  font-family: var(--font-mono-stack);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+}
+
+.pf-badge.is-mini {
+  min-width: 20px;
+  height: 15px;
+  padding: 0 3px;
+  font-size: 9px;
+}
+
+.pf-format {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Chip approval klien */
+.apv {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: var(--r-sm);
+  font-size: 11.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  background: var(--sunken);
+  color: var(--ink-2);
+}
+
+.apv.is-small {
+  height: 20px;
+  padding: 0 6px;
+  font-size: 10.5px;
+}
+
+.apv.is-warn {
+  background: var(--warn-bg);
+  color: var(--warn);
+}
+
+.apv.is-ok {
+  background: var(--ok-bg);
+  color: var(--ok);
+}
+
+.apv.is-danger {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.cp-pillar {
+  display: block;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+.cp-time {
+  font-family: var(--font-mono-stack);
+  font-size: 10.5px;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.cp-empty {
+  margin: 0 24px 16px;
+  padding: 18px 20px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+}
+
+.cp-empty h3 {
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.cp-empty p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+/* Kalender konten */
+.cp-cell-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.cp-add {
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--faint);
+  opacity: 0;
+  transition: opacity 0.12s, background 0.12s, color 0.12s;
+}
+
+.cp-cell:hover .cp-add,
+.cp-add:focus-visible {
+  opacity: 1;
+}
+
+.cp-add:hover {
+  background: var(--hover);
+  color: var(--ink);
+}
+
+.cp-chip {
+  gap: 5px;
+}
+
+/* Tabel konten */
+.cp-table-wrap {
+  padding: 2px 24px 32px;
+}
+
+.cp-table-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+}
+
+.cp-table {
+  width: 100%;
+  min-width: 860px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.cp-table th {
+  position: sticky;
+  top: 0;
+  padding: 9px 12px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+
+.cp-table td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+}
+
+.cp-table tbody tr {
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.cp-table tbody tr:hover {
+  background: var(--surface-2);
+}
+
+.cp-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.cp-table td.is-late {
+  color: var(--danger);
+}
+
+.cp-title-cell {
+  font-weight: 500;
+  min-width: 200px;
+}
+
+.cp-title-cell .cp-pillar {
+  font-weight: 400;
+}
+
+/* Panel detail konten */
+.cp-two {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+}
+
+.cp-section {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 22px;
+}
+
+.cp-section .section-head {
+  margin-bottom: 0;
+}
+
+.cp-approval {
+  margin: 0 0 2px;
+}
+
+.cp-approval button {
+  font-size: 11.5px;
+  padding: 0 6px;
+}
+
+.cp-approval button.is-active.is-warn {
+  color: var(--warn);
+}
+
+.cp-approval button.is-active.is-ok {
+  color: var(--ok);
+}
+
+.cp-approval button.is-active.is-danger {
+  color: var(--danger);
+}
+
+.cp-approval button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
 /* ==========================================================================
    Responsif
    Desktop  > 1100px : sidebar tetap, semua kolom papan terlihat.
@@ -3376,5 +3653,64 @@ select.field:disabled {
   from {
     opacity: 0;
     transform: translateY(24px);
+  }
+}
+
+/* ---------- Content plan di tablet & HP ---------- */
+@media (max-width: 1100px) {
+  .cp-table-wrap {
+    padding: 2px 20px 28px;
+  }
+
+  .cp-empty {
+    margin: 0 20px 16px;
+  }
+}
+
+@media (max-width: 640px) {
+  .cp-table-wrap {
+    padding: 2px 16px calc(96px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .cp-empty {
+    margin: 0 16px 14px;
+  }
+
+  .toolbar .toolbar-export {
+    grid-column: 1 / -1;
+    height: 38px;
+  }
+
+  .cp-approval {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .cp-approval button {
+    height: 34px;
+  }
+
+  .calendar-cell .cp-time {
+    display: none;
+  }
+
+  /* Di HP grid terlalu sempit untuk tombol + per tanggal; pakai tombol "Konten baru" yang melayang. */
+  .cp-add {
+    display: none;
+  }
+
+  .cp-cell-head {
+    justify-content: center;
+  }
+
+  .workspace-switch button {
+    height: 38px;
+    font-size: 13.5px;
+  }
+}
+
+@media (hover: none) {
+  .cp-add {
+    opacity: 1;
   }
 }

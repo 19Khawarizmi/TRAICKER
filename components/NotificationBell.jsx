@@ -77,7 +77,7 @@ export default function NotificationBell({ userId, profileOf, Avatar, onOpenTask
       setItems((prev) => prev.map((x) => (x.id === n.id ? { ...x, read: true } : x)));
       db.markNotificationsRead([n.id]).catch(load);
     }
-    if (n.taskId) onOpenTask(n.taskId);
+    if (n.taskId || n.postId) onOpenTask(n);
   }
 
   function toggle() {

@@ -24,9 +24,10 @@ const ICONS = {
   created: "plus", status: "status", assigned: "user", due: "calendar", start: "calendar", priority: "flag",
   title: "edit", client: "folder", subtask_added: "plus", subtask_done: "check", subtask_undone: "restore",
   subtask_assigned: "user", subtask_renamed: "edit", subtask_removed: "x",
+  approval: "check", schedule: "calendar", specialist: "user", designer: "user", platform: "columns",
 };
 
-function describe(item, { columnLabel, personName, clientName }) {
+function describe(item, { columnLabel, personName, clientName, platformName, approvalLabel }) {
   const m = item.meta || {};
   const q = (s) => `“${s}”`;
   switch (item.action) {
@@ -38,6 +39,11 @@ function describe(item, { columnLabel, personName, clientName }) {
     case "priority": return <>mengubah prioritas ke <b>{m.to}</b></>;
     case "title": return <>mengganti judul jadi <b>{q(m.to)}</b></>;
     case "client": return <>memindahkan ke klien <b>{clientName(m.to)}</b></>;
+    case "approval": return <>menandai approval: <b>{approvalLabel(m.to)}</b></>;
+    case "schedule": return m.date ? <>menjadwalkan tayang ke <b>{fmtDay(m.date)}{m.time ? `, ${String(m.time).slice(0, 5)}` : ""}</b></> : "menghapus jadwal tayang";
+    case "specialist": return m.to ? <>menugaskan sosmed specialist <b>{personName(m.to)}</b></> : "menghapus sosmed specialist";
+    case "designer": return m.to ? <>menugaskan desainer <b>{personName(m.to)}</b></> : "menghapus desainer";
+    case "platform": return <>mengubah platform ke <b>{platformName(m.platform)}{m.format ? ` · ${m.format}` : ""}</b></>;
     case "subtask_added": return <>menambah subtask {q(m.text)}</>;
     case "subtask_done": return <>menyelesaikan {q(m.text)}</>;
     case "subtask_undone": return <>membuka lagi {q(m.text)}</>;
@@ -48,7 +54,8 @@ function describe(item, { columnLabel, personName, clientName }) {
   }
 }
 
-export default function TaskFeed({ taskId, currentUserId, isAdmin, profileOf, clientOf, columnLabel, Avatar }) {
+// `field` = "task_id" untuk tugas project, "post_id" untuk konten.
+export default function TaskFeed({ taskId, field = "task_id", currentUserId, isAdmin, profileOf, clientOf, columnLabel, platformName = (id) => id, approvalLabel = (id) => id, Avatar }) {
   const [items, setItems] = useState(null);
   const [error, setError] = useState("");
   const [draft, setDraft] = useState("");
@@ -61,7 +68,7 @@ export default function TaskFeed({ taskId, currentUserId, isAdmin, profileOf, cl
 
   async function load() {
     try {
-      setItems(await db.fetchTaskFeed(taskId));
+      setItems(await db.fetchTaskFeed(taskId, field));
       setError("");
     } catch (e) {
       setError(e.message || "Gagal memuat komentar.");
@@ -77,8 +84,8 @@ export default function TaskFeed({ taskId, currentUserId, isAdmin, profileOf, cl
     };
     const channel = supabase
       .channel(`task-feed-${taskId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "task_comments", filter: `task_id=eq.${taskId}` }, reload)
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "task_activity", filter: `task_id=eq.${taskId}` }, reload)
+      .on("postgres_changes", { event: "*", schema: "public", table: "task_comments", filter: `${field}=eq.${taskId}` }, reload)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "task_activity", filter: `${field}=eq.${taskId}` }, reload)
       .subscribe();
     return () => {
       clearTimeout(reloadTimer.current);
@@ -92,7 +99,7 @@ export default function TaskFeed({ taskId, currentUserId, isAdmin, profileOf, cl
     setSending(true);
     setError("");
     try {
-      await db.addComment(taskId, draft);
+      await db.addComment(taskId, draft, field);
       setDraft("");
       await load();
       requestAnimationFrame(() => endRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }));
@@ -127,6 +134,8 @@ export default function TaskFeed({ taskId, currentUserId, isAdmin, profileOf, cl
     columnLabel,
     personName: (id) => profileOf(id)?.name || "anggota yang sudah dihapus",
     clientName: (id) => clientOf(id)?.name || id,
+    platformName,
+    approvalLabel,
   };
 
   // Aktivitas lama diringkas supaya komentar tetap menonjol.
