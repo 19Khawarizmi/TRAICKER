@@ -804,7 +804,7 @@ export default function AgencyTracker() {
         <section className="page-head">
           <div>
             <h1 className="page-title">
-              {viewClient ? viewClient.name : <>Semua <em>klien</em></>}
+              {viewClient ? viewClient.name : "Semua klien"}
             </h1>
             <div className="page-meta">
               <span className="mono">{visibleTasks.length}</span> tugas

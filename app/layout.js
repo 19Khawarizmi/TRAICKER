@@ -1,10 +1,9 @@
-import { Geist, Geist_Mono, Instrument_Serif } from "next/font/google";
+import { Figtree } from "next/font/google";
 import { themeInitScript } from "@/components/themeScript";
 import "./globals.css";
 
-const sans = Geist({ subsets: ["latin"], variable: "--font-sans", display: "swap" });
-const mono = Geist_Mono({ subsets: ["latin"], variable: "--font-mono", display: "swap" });
-const serif = Instrument_Serif({ subsets: ["latin"], weight: "400", style: ["normal", "italic"], variable: "--font-serif", display: "swap" });
+// Satu font untuk semua teks (judul, isi, angka). Angka memakai tabular-nums supaya tetap rata.
+const sans = Figtree({ subsets: ["latin"], variable: "--font-sans", display: "swap" });
 
 export const metadata = {
   title: "Traicker",
@@ -21,7 +20,7 @@ export const viewport = {
 export default function RootLayout({ children }) {
   return (
     // data-theme dipasang oleh script sebelum hydration, jadi atributnya memang bisa berbeda dari HTML server.
-    <html lang="id" className={`${sans.variable} ${mono.variable} ${serif.variable}`} suppressHydrationWarning>
+    <html lang="id" className={sans.variable} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>

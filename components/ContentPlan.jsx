@@ -331,7 +331,7 @@ export default function ContentPlan({
       <section className="page-head">
         <div>
           <p className="kicker-ws"><Icon name="calendar" size={12} /> Content plan</p>
-          <h1 className="page-title">{viewClient ? viewClient.name : <>Semua <em>klien</em></>}</h1>
+          <h1 className="page-title">{viewClient ? viewClient.name : "Semua klien"}</h1>
           <div className="page-meta">
             <span className="mono">{visiblePosts.length}</span> konten
             <span className="sep">·</span>

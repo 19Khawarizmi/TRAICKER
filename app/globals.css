@@ -60,8 +60,6 @@
   --sidebar-w: 224px;
 
   --font-sans-stack: var(--font-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-serif-stack: var(--font-serif), "Iowan Old Style", Georgia, serif;
-  --font-mono-stack: var(--font-mono), ui-monospace, "SF Mono", Menlo, monospace;
 }
 
 /* ---------- Mode gelap ----------
@@ -224,16 +222,15 @@ button {
   display: block;
 }
 
+/* Angka (tanggal, jumlah, metrik): rata lurus antarbaris. */
 .mono {
-  font-family: var(--font-mono-stack);
-  font-feature-settings: "tnum";
-  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
 }
 
+/* Judul tampilan (bulan di kalender/report, dsb.). */
 .serif {
-  font-family: var(--font-serif-stack);
-  font-weight: 400;
-  letter-spacing: -0.01em;
+  font-weight: 650;
+  letter-spacing: -0.02em;
 }
 
 /* ---------- Kontrol dasar ---------- */
@@ -316,7 +313,8 @@ button {
 }
 
 .kbd {
-  font-family: var(--font-mono-stack);
+  font-family: var(--font-sans-stack);
+  font-variant-numeric: tabular-nums;
   font-size: 10.5px;
   color: var(--muted);
   border: 1px solid var(--line);
@@ -824,17 +822,16 @@ textarea.field {
 }
 
 .brand-name {
-  font-family: var(--font-serif-stack);
-  font-size: 21px;
-  letter-spacing: -0.015em;
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
   line-height: 1;
 }
 
 /* "ai" di Traicker = nama panggilan pemilik, jadi dibuat menonjol. */
 .brand-name em {
-  font-style: italic;
+  font-style: normal;
   color: var(--brand-accent);
-  padding-right: 0.02em;
 }
 
 .nav-label {
@@ -884,7 +881,8 @@ textarea.field {
 }
 
 .nav-count {
-  font-family: var(--font-mono-stack);
+  font-family: var(--font-sans-stack);
+  font-variant-numeric: tabular-nums;
   font-size: 11px;
   color: var(--faint);
 }
@@ -1029,22 +1027,16 @@ textarea.field {
 
 .page-title {
   margin: 0;
-  font-family: var(--font-serif-stack);
-  font-weight: 400;
-  font-size: 40px;
-  line-height: 1;
-  letter-spacing: -0.02em;
-}
-
-.page-title em {
-  font-style: italic;
-  color: var(--muted);
+  font-weight: 700;
+  font-size: 30px;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
 }
 
 .page-meta {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 5px; /* jarak angka–kata seperti spasi biasa */
   flex-wrap: wrap;
   margin-top: 10px;
   font-size: 13px;
@@ -1185,14 +1177,16 @@ textarea.field {
 }
 
 .tag-late {
-  font-family: var(--font-mono-stack);
+  font-family: var(--font-sans-stack);
+  font-variant-numeric: tabular-nums;
   font-size: 11px;
   color: var(--danger);
   white-space: nowrap;
 }
 
 .tag-soon {
-  font-family: var(--font-mono-stack);
+  font-family: var(--font-sans-stack);
+  font-variant-numeric: tabular-nums;
   font-size: 11px;
   color: var(--warn);
   white-space: nowrap;
@@ -1254,7 +1248,8 @@ textarea.field {
 }
 
 .column-count {
-  font-family: var(--font-mono-stack);
+  font-family: var(--font-sans-stack);
+  font-variant-numeric: tabular-nums;
   font-size: 11.5px;
   color: var(--muted);
 }
@@ -1424,7 +1419,8 @@ textarea.field {
 }
 
 .progress-label {
-  font-family: var(--font-mono-stack);
+  font-family: var(--font-sans-stack);
+  font-variant-numeric: tabular-nums;
   font-size: 11px;
   color: var(--muted);
 }
@@ -1444,7 +1440,8 @@ textarea.field {
   align-items: center;
   gap: 3px;
   color: var(--faint);
-  font-family: var(--font-mono-stack);
+  font-family: var(--font-sans-stack);
+  font-variant-numeric: tabular-nums;
   font-size: 11px;
 }
 
@@ -1456,7 +1453,8 @@ textarea.field {
   padding: 0 7px;
   border-radius: var(--r-sm);
   border: 1px solid var(--line);
-  font-family: var(--font-mono-stack);
+  font-family: var(--font-sans-stack);
+  font-variant-numeric: tabular-nums;
   font-size: 11px;
   color: var(--ink-2);
   white-space: nowrap;
@@ -1634,10 +1632,10 @@ textarea.field {
   background: transparent;
   resize: none;
   overflow: hidden;
-  font-family: var(--font-serif-stack);
-  font-size: 30px;
-  line-height: 1.15;
-  letter-spacing: -0.015em;
+  font-size: 24px;
+  font-weight: 650;
+  line-height: 1.2;
+  letter-spacing: -0.025em;
   color: var(--ink);
 }
 
@@ -1905,11 +1903,10 @@ textarea.field {
 
 .dialog-title {
   margin: 0;
-  font-family: var(--font-serif-stack);
-  font-weight: 400;
-  font-size: 28px;
-  line-height: 1.05;
-  letter-spacing: -0.015em;
+  font-weight: 650;
+  font-size: 20px;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
 }
 
 .dialog-sub {
@@ -2101,16 +2098,15 @@ textarea.field {
 
 .auth-title {
   margin: 0;
-  font-family: var(--font-serif-stack);
-  font-weight: 400;
-  font-size: 52px;
-  line-height: 0.95;
-  letter-spacing: -0.03em;
+  font-weight: 700;
+  font-size: 40px;
+  line-height: 1;
+  letter-spacing: -0.04em;
 }
 
 .auth-title em {
+  font-style: normal;
   color: var(--brand-accent);
-  padding-right: 0.02em;
 }
 
 .auth-sub {
@@ -2592,7 +2588,7 @@ textarea.field {
 }
 
 .calendar-title {
-  font-size: 26px;
+  font-size: 22px;
   line-height: 1;
   text-transform: capitalize;
 }
@@ -2650,7 +2646,8 @@ textarea.field {
   height: 22px;
   padding: 0 5px;
   border-radius: var(--r-sm);
-  font-family: var(--font-mono-stack);
+  font-family: var(--font-sans-stack);
+  font-variant-numeric: tabular-nums;
   font-size: 11.5px;
   line-height: 22px;
   text-align: center;
@@ -2971,7 +2968,8 @@ textarea.field {
   border-radius: 4px;
   background: var(--pf);
   color: #fff;
-  font-family: var(--font-mono-stack);
+  font-family: var(--font-sans-stack);
+  font-variant-numeric: tabular-nums;
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.02em;
@@ -3033,7 +3031,8 @@ textarea.field {
 }
 
 .cp-time {
-  font-family: var(--font-mono-stack);
+  font-family: var(--font-sans-stack);
+  font-variant-numeric: tabular-nums;
   font-size: 10.5px;
   color: var(--muted);
   flex-shrink: 0;
@@ -3291,7 +3290,7 @@ textarea.field {
 .rp-month-label {
   min-width: 150px;
   text-align: center;
-  font-size: 22px;
+  font-size: 19px;
 }
 
 .rp-note {
@@ -3380,7 +3379,8 @@ textarea.field {
   border: 1px dashed var(--line-strong);
   border-radius: 4px;
   background: var(--surface);
-  font-family: var(--font-mono-stack);
+  font-family: var(--font-sans-stack);
+  font-variant-numeric: tabular-nums;
 }
 
 .rp-tile-input::placeholder {
@@ -3396,7 +3396,8 @@ textarea.field {
 }
 
 .rp-delta {
-  font-family: var(--font-mono-stack);
+  font-family: var(--font-sans-stack);
+  font-variant-numeric: tabular-nums;
   font-size: 11px;
   color: var(--muted);
   white-space: nowrap;
@@ -3418,7 +3419,8 @@ textarea.field {
 }
 
 .rp-from {
-  font-family: var(--font-mono-stack);
+  font-family: var(--font-sans-stack);
+  font-variant-numeric: tabular-nums;
   font-size: 11px;
   color: var(--muted);
 }
@@ -3483,7 +3485,8 @@ textarea.field {
 
 .rp-axis {
   fill: var(--muted);
-  font-family: var(--font-mono-stack);
+  font-family: var(--font-sans-stack);
+  font-variant-numeric: tabular-nums;
   font-size: 10px;
 }
 
@@ -3833,7 +3836,7 @@ textarea.field {
   }
 
   .topbar-brand .brand-name {
-    font-size: 19px;
+    font-size: 18px;
   }
 
   .search {
@@ -3845,7 +3848,7 @@ textarea.field {
   }
 
   .page-title {
-    font-size: 34px;
+    font-size: 28px;
   }
 
   /* Papan: kolom digeser satu-satu dengan snap. */
@@ -4007,12 +4010,12 @@ textarea.field {
   }
 
   .page-title {
-    font-size: 30px;
+    font-size: 26px;
   }
 
   .page-meta {
     font-size: 12.5px;
-    gap: 6px;
+    gap: 5px;
   }
 
   .toolbar {
@@ -4087,7 +4090,7 @@ textarea.field {
   }
 
   .title-input {
-    font-size: 26px;
+    font-size: 21px;
   }
 
   .props {
@@ -4126,7 +4129,7 @@ textarea.field {
   }
 
   .dialog-title {
-    font-size: 24px;
+    font-size: 19px;
   }
 
   .dialog-body {
@@ -4187,7 +4190,7 @@ textarea.field {
   }
 
   .calendar-title {
-    font-size: 22px;
+    font-size: 19px;
   }
 
   .calendar-dow {
@@ -4331,7 +4334,7 @@ textarea.field {
   }
 
   .auth-title {
-    font-size: 44px;
+    font-size: 34px;
   }
 
   .auth-sub {
@@ -4503,7 +4506,7 @@ textarea.field {
 
   .rp-month-label {
     min-width: 0;
-    font-size: 20px;
+    font-size: 18px;
   }
 
   .rp-platform {
