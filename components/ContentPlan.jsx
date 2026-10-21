@@ -84,6 +84,8 @@ export default function ContentPlan({
   const [personFilter, setPersonFilter] = useState("all"); // all | me | none | id
   const [platformFilter, setPlatformFilter] = useState("all");
   const [editing, setEditing] = useState(null);
+  // Versi konten saat panel dibuka. Saat simpan, hanya yang diubah dibanding versi ini yang ditulis.
+  const editBaseRef = useRef(null);
   const [dragId, setDragId] = useState(null);
   const [dropTarget, setDropTarget] = useState(null); // tahap (pipeline) atau tanggal (kalender)
   const [cursor, setCursor] = useState(() => {
@@ -232,6 +234,7 @@ export default function ContentPlan({
 
   function openNew(date) {
     const platform = activePlatforms[0];
+    editBaseRef.current = null;
     setEditing({
       id: crypto.randomUUID(),
       isNew: true,
@@ -261,6 +264,7 @@ export default function ContentPlan({
   }
 
   function openEdit(p) {
+    editBaseRef.current = p;
     setEditing({ ...p });
   }
 
@@ -268,14 +272,26 @@ export default function ContentPlan({
     if (!editing.title.trim()) return;
     const { isNew, ...post } = editing;
     const original = isNew ? null : posts.find((p) => p.id === post.id);
-    post.approvalChanged = !original || original.approval !== post.approval;
-    post.metricsChanged = METRIC_FIELDS.some((f) => (original?.metrics?.[f.key] ?? null) !== (post.metrics?.[f.key] ?? null));
+    if (!isNew && !original) {
+      // Konten sudah dihapus anggota lain selama panel terbuka.
+      setEditing(null);
+      save(async () => { throw new Error("Konten ini sudah dihapus oleh anggota lain."); });
+      return;
+    }
+    const base = isNew ? null : editBaseRef.current || original;
+    post.approvalChanged = !base || base.approval !== post.approval;
+    post.metricsChanged = METRIC_FIELDS.some((f) => (base?.metrics?.[f.key] ?? null) !== (post.metrics?.[f.key] ?? null));
     const { approvalChanged, metricsChanged, ...local } = post;
     if (metricsChanged) local.metricsUpdatedAt = new Date().toISOString();
-    if (isNew) setPosts((prev) => [...prev, local]);
-    else setPosts((prev) => prev.map((p) => (p.id === post.id ? local : p)));
+    if (isNew) {
+      setPosts((prev) => [...prev, local]);
+    } else {
+      // Gabungkan: kolom yang diubah di panel + versi terbaru untuk sisanya (bisa saja baru diubah rekan lain).
+      const changed = Object.fromEntries(Object.entries(local).filter(([k, v]) => JSON.stringify(v) !== JSON.stringify(base[k])));
+      setPosts((prev) => prev.map((p) => (p.id === post.id ? { ...original, ...changed } : p)));
+    }
     setEditing(null);
-    save(() => cdb.savePost(post, isNew));
+    save(() => cdb.savePost(post, isNew, base));
   }
 
   function removePost(p) {

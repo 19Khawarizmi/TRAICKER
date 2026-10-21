@@ -175,6 +175,8 @@ export default function AgencyTracker() {
   const [view, setView] = useState("board"); // board | calendar | timeline
   const [newSubtask, setNewSubtask] = useState("");
   const [expandedSubtask, setExpandedSubtask] = useState(null);
+  // Versi tugas saat panel dibuka. Saat simpan, hanya yang diubah dibanding versi ini yang ditulis.
+  const editBaseRef = useRef(null);
 
   async function loadBoard() {
     try {
@@ -458,6 +460,7 @@ export default function AgencyTracker() {
   function openNew() {
     // ID dibuat di client supaya lampiran bisa langsung di-upload sebelum tugas disimpan.
     // Member yang membuat tugas otomatis jadi assignee-nya; admin bebas memilih.
+    editBaseRef.current = null;
     setEditing({ id: crypto.randomUUID(), isNew: true, title: "", client: activeClients[0]?.id, assignee: isAdmin ? null : currentUserId, createdBy: currentUserId, priority: "Sedang", due: todayStr, start: "", column: "todo", subtasks: [] });
     setNewSubtask("");
     setExpandedSubtask(null);
@@ -465,6 +468,7 @@ export default function AgencyTracker() {
   }
 
   function openEdit(task) {
+    editBaseRef.current = task;
     setEditing({ ...task, subtasks: task.subtasks ? task.subtasks.map((s) => ({ ...s })) : [] });
     setNewSubtask("");
     setExpandedSubtask(null);
@@ -554,6 +558,14 @@ export default function AgencyTracker() {
     const { isNew, ...task } = editing;
     task.subtasks = task.subtasks.map(({ fileError, ...s }) => s);
     const original = isNew ? null : tasks.find((t) => t.id === task.id);
+    if (!isNew && !original) {
+      // Tugas sudah dihapus anggota lain selama panel terbuka.
+      setModalOpen(false);
+      setSaveState("error");
+      setSaveError("Tugas ini sudah dihapus oleh anggota lain.");
+      return;
+    }
+    const base = isNew ? null : editBaseRef.current || original;
 
     // Bukan admin/pemegang task: hanya simpan subtask yang ditugaskan ke dirinya (kolom pengerjaan saja).
     if (!isNew && !canEditTask(original)) {
@@ -562,7 +574,7 @@ export default function AgencyTracker() {
       if (mine.length === 0) return;
       const byId = new Map(mine.map((s) => [s.id, s]));
       setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, subtasks: t.subtasks.map((s) => byId.get(s.id) || s) } : t)));
-      persist(() => db.saveOwnSubtasks(mine, original.subtasks));
+      persist(() => db.saveOwnSubtasks(mine, base.subtasks));
       return;
     }
 
@@ -570,10 +582,21 @@ export default function AgencyTracker() {
       task.position = tasks.reduce((max, t) => Math.max(max, t.position || 0), 0) + 1;
       setTasks((prev) => [...prev, task]);
     } else {
-      setTasks((prev) => prev.map((t) => (t.id === task.id ? task : t)));
+      // Gabungkan: kolom yang diubah di panel + versi terbaru untuk sisanya (bisa saja baru diubah rekan lain).
+      const fields = ["title", "client", "assignee", "priority", "due", "start", "column"];
+      const changedFields = Object.fromEntries(fields.filter((k) => task[k] !== base[k]).map((k) => [k, task[k]]));
+      const changedIds = new Set(db.changedSubtasks(task, base).map((s) => s.id));
+      const removedIds = new Set(base.subtasks.filter((s) => !task.subtasks.some((x) => x.id === s.id)).map((s) => s.id));
+      const latestById = new Map(original.subtasks.map((s) => [s.id, s]));
+      const addedByOthers = original.subtasks.filter((s) => !base.subtasks.some((b) => b.id === s.id) && !removedIds.has(s.id));
+      const subtasks = [
+        ...task.subtasks.map((s) => (changedIds.has(s.id) ? s : latestById.get(s.id))).filter(Boolean),
+        ...addedByOthers.filter((s) => !task.subtasks.some((x) => x.id === s.id)),
+      ];
+      setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...original, ...changedFields, subtasks } : t)));
     }
     setModalOpen(false);
-    persist(() => db.saveTask(task, original));
+    persist(() => db.saveTask(task, base));
   }
 
   // Hak akses untuk modal yang sedang dibuka (berdasarkan versi tersimpan, bukan yang sedang diedit).
