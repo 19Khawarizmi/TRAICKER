@@ -9,6 +9,7 @@ import Icon from "@/components/icons";
 import TaskFeed from "@/components/TaskFeed";
 import ReportView from "@/components/ReportView";
 import Select from "@/components/Select";
+import { showToast, askConfirm, confirmDelete } from "@/components/Feedback";
 import { METRIC_FIELDS, hasValues, engagementOf, actionsOf, erOf, fmtInt, fmtPct } from "@/lib/contentMetrics";
 
 // Ruang kerja Content plan: kalender, pipeline per tahap produksi, dan tabel.
@@ -58,6 +59,11 @@ function EmptyAvatar({ size = 18 }) {
   );
 }
 
+// Isi panel detail konten yang bisa diubah, untuk mendeteksi perubahan yang belum disimpan.
+const POST_DRAFT_KEYS = ["client", "platform", "format", "title", "date", "time", "pillar", "brief", "caption", "hashtags", "visualLink", "postLink", "status", "approval", "approvalNote", "specialist", "designer", "metrics", "boosted", "insight"];
+const postDraftOf = (p) => (p ? JSON.stringify(POST_DRAFT_KEYS.map((k) => p[k] ?? null)) : "");
+const shortTitle = (t) => (t.length > 40 ? `${t.slice(0, 38)}…` : t);
+
 function PlatformTag({ platform, format }) {
   if (!platform) return null;
   return (
@@ -87,6 +93,12 @@ export default function ContentPlan({
   const [editing, setEditing] = useState(null);
   // Versi konten saat panel dibuka. Saat simpan, hanya yang diubah dibanding versi ini yang ditulis.
   const editBaseRef = useRef(null);
+  // Isi panel saat dibuka (juga untuk konten baru), pembanding "ada perubahan yang belum disimpan?".
+  const editOpenedRef = useRef(null);
+  const editingRef = useRef(null);
+  editingRef.current = editing;
+  // Konten yang baru dihapus dan masih bisa di-urungkan: belum dihapus di database.
+  const pendingDeletesRef = useRef(new Set());
   const [dragId, setDragId] = useState(null);
   const [dropTarget, setDropTarget] = useState(null); // tahap (pipeline) atau tanggal (kalender)
   const [cursor, setCursor] = useState(() => {
@@ -102,7 +114,7 @@ export default function ContentPlan({
     try {
       const board = await cdb.fetchContentBoard();
       setPlatforms(board.platforms);
-      setPosts(board.posts);
+      setPosts(board.posts.filter((p) => !pendingDeletesRef.current.has(p.id)));
       setFollowers(board.followers);
       setTargets(board.targets);
       setQuotas(board.quotas);
@@ -234,7 +246,7 @@ export default function ContentPlan({
     function onKey(e) {
       if (e.key !== "Escape" || e.defaultPrevented || !active) return;
       if (platformDialog) setPlatformDialog(false);
-      else if (editing) setEditing(null);
+      else if (editing) requestClosePost();
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -243,7 +255,7 @@ export default function ContentPlan({
   function openNew(date) {
     const platform = activePlatforms[0];
     editBaseRef.current = null;
-    setEditing({
+    const fresh = {
       id: crypto.randomUUID(),
       isNew: true,
       client: activeClient !== "all" ? activeClient : activeClients[0]?.id,
@@ -268,12 +280,41 @@ export default function ContentPlan({
       metrics: {},
       boosted: false,
       insight: "",
-    });
+    };
+    editOpenedRef.current = fresh;
+    setEditing(fresh);
   }
 
   function openEdit(p) {
     editBaseRef.current = p;
+    editOpenedRef.current = p;
     setEditing({ ...p });
+  }
+
+  // Esc, klik di luar panel, atau tombol ✕: kalau ada perubahan yang belum disimpan, tanya dulu.
+  // (Tombol Batal = sengaja membatalkan, jadi langsung ditutup.)
+  async function requestClosePost() {
+    const draft = editingRef.current;
+    if (!draft || postDraftOf(draft) === postDraftOf(editOpenedRef.current)) {
+      setEditing(null);
+      return;
+    }
+    const saved = draft.isNew ? null : posts.find((p) => p.id === draft.id);
+    const canEdit = draft.isNew || (!!saved && canEditPost(saved));
+    const holdsIt = canManage || draft.specialist === currentUserId || draft.designer === currentUserId;
+    const canSave = canEdit && holdsIt && !!draft.title.trim() && !!draft.platform && !!draft.client;
+    const choice = await askConfirm({
+      title: draft.isNew ? "Simpan konten baru ini?" : "Simpan perubahan?",
+      body: draft.isNew ? "Konten ini belum disimpan. Kalau ditutup sekarang, isiannya hilang." : "Ada perubahan di konten ini yang belum disimpan.",
+      cancelId: "keep",
+      actions: [
+        { id: "discard", label: "Buang", tone: "secondary" },
+        { id: "keep", label: "Lanjut edit", tone: "secondary" },
+        ...(canSave ? [{ id: "save", label: "Simpan", tone: "primary" }] : []),
+      ],
+    });
+    if (choice === "save") savePostRef.current();
+    else if (choice === "discard") setEditing(null);
   }
 
   function savePost() {
@@ -302,12 +343,27 @@ export default function ContentPlan({
     save(() => cdb.savePost(post, isNew, base));
   }
 
+  // Hapus konten bisa di-urungkan selama toast tampil (±8 detik); baru setelah itu dihapus di database.
   function removePost(p) {
-    if (!window.confirm(`Hapus konten "${p.title}"?`)) return;
+    pendingDeletesRef.current.add(p.id);
     setPosts((prev) => prev.filter((x) => x.id !== p.id));
     setEditing(null);
-    save(() => cdb.deletePost(p.id));
+    showToast({
+      message: `Konten "${shortTitle(p.title)}" dihapus`,
+      actionLabel: "Urungkan",
+      onAction: () => {
+        pendingDeletesRef.current.delete(p.id);
+        setPosts((prev) => (prev.some((x) => x.id === p.id) ? prev : [...prev, p]));
+      },
+      onExpire: () => {
+        pendingDeletesRef.current.delete(p.id);
+        save(() => cdb.deletePost(p.id));
+      },
+    });
   }
+
+  const savePostRef = useRef(null);
+  savePostRef.current = savePost;
 
   function patchPost(p, fields) {
     if (!canEditPost(p)) return;
@@ -591,6 +647,7 @@ export default function ContentPlan({
           Avatar={Avatar}
           onSave={savePost}
           onDelete={removePost}
+          onClose={requestClosePost}
         />
       )}
 
@@ -789,7 +846,7 @@ function ContentCalendar({ posts, cursor, setCursor, todayStr, platformOf, clien
 // ---------------------------------------------------------------------------------------------
 // Panel detail konten
 
-function PostDrawer({ editing, setEditing, saved, clients, platforms, posts, personOptions, currentUserId, isAdmin, canManage, canEditPost, canDeletePost, clientOf, platformOf, profileOf, Avatar, onSave, onDelete }) {
+function PostDrawer({ editing, setEditing, onClose, saved, clients, platforms, posts, personOptions, currentUserId, isAdmin, canManage, canEditPost, canDeletePost, clientOf, platformOf, profileOf, Avatar, onSave, onDelete }) {
   const canEdit = editing.isNew || (!!saved && canEditPost(saved));
   const pf = platformOf(editing.platform);
   const set = (fields) => setEditing((prev) => ({ ...prev, ...fields }));
@@ -802,7 +859,7 @@ function PostDrawer({ editing, setEditing, saved, clients, platforms, posts, per
 
   return (
     <>
-      <div className="scrim" onClick={() => setEditing(null)} />
+      <div className="scrim" onClick={onClose} />
       <aside className="drawer" role="dialog" aria-modal="true" aria-label={editing.isNew ? "Konten baru" : "Detail konten"}>
         <div className="drawer-head">
           <div className="crumbs">
@@ -811,7 +868,7 @@ function PostDrawer({ editing, setEditing, saved, clients, platforms, posts, per
             <Icon name="chevronRight" size={13} />
             <span>{editing.isNew ? "Konten baru" : stage?.label}</span>
           </div>
-          <button className="btn btn-ghost btn-icon" onClick={() => setEditing(null)} aria-label="Tutup"><Icon name="x" /></button>
+          <button className="btn btn-ghost btn-icon" onClick={onClose} aria-label="Tutup"><Icon name="x" /></button>
         </div>
 
         <div className="drawer-body">
@@ -1114,13 +1171,13 @@ function PlatformDialog({ platforms, posts, onClose, onChange, save }) {
     save(() => cdb.setPlatformArchived(p.id, !p.archived));
   }
 
-  function remove(p) {
+  async function remove(p) {
     const used = posts.filter((x) => x.platform === p.id).length;
     if (used > 0) {
       setError(`"${p.name}" masih dipakai ${used} konten. Arsipkan saja supaya tidak muncul di pilihan.`);
       return;
     }
-    if (!window.confirm(`Hapus platform "${p.name}"?`)) return;
+    if (!(await confirmDelete({ title: `Hapus platform "${p.name}"?`, body: "Platform ini belum dipakai konten mana pun dan akan dihapus permanen." }))) return;
     onChange(platforms.filter((x) => x.id !== p.id));
     save(() => cdb.deletePlatform(p.id));
   }

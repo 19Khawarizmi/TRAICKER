@@ -5,3 +5,9 @@ out
 .env*.local
 npm-debug.log*
 .DS_Store
+pitch/
+# Impeccable (skill desain lokal + program pendukung ±22MB, tidak perlu masuk repo)
+.claude/skills/impeccable/
+.claude/agents/impeccable-*
+.claude/settings.local.json
+.impeccable/

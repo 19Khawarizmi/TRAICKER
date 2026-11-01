@@ -5,6 +5,7 @@ import Icon from "@/components/icons";
 import Select from "@/components/Select";
 import * as db from "@/lib/trackerData";
 import { ROLES, ROLE_LABEL, ROLE_DESCRIPTION } from "@/lib/roles";
+import { confirmDelete } from "@/components/Feedback";
 
 // Kelola anggota tim (hanya admin). Semua aksi dicek ulang di server (/api/admin/users),
 // tombol yang dikunci di sini hanya untuk kenyamanan.
@@ -165,9 +166,11 @@ export default function TeamDialog({ profiles, jobTitles, onJobTitlesChange, per
   }
 
   async function remove(p) {
-    const ok = window.confirm(
-      `Hapus akun ${p.name} (${p.email})?\n\nTugas yang ditugaskan ke dia akan jadi "belum ditugaskan". Tindakan ini tidak bisa dibatalkan.`
-    );
+    const ok = await confirmDelete({
+      title: `Hapus akun ${p.name}?`,
+      body: `${p.email} tidak bisa login lagi. Tugas dan konten yang dia pegang jadi "belum ditugaskan". Tindakan ini tidak bisa dibatalkan.`,
+      confirmLabel: "Hapus akun",
+    });
     if (!ok) return;
     setBusyId(p.id);
     setRowError({ id: null, message: "" });
@@ -227,9 +230,12 @@ export default function TeamDialog({ profiles, jobTitles, onJobTitlesChange, per
     setJobEdit({ id: null, name: "" });
   }
 
-  function removeJob(j) {
+  async function removeJob(j) {
     const used = profiles.filter((p) => p.jobTitleId === j.id).length;
-    const ok = window.confirm(used ? `Hapus jabatan "${j.name}"? ${used} anggota yang memakainya akan jadi tanpa jabatan.` : `Hapus jabatan "${j.name}"?`);
+    const ok = await confirmDelete({
+      title: `Hapus jabatan "${j.name}"?`,
+      body: used ? `${used} anggota yang memakainya akan jadi tanpa jabatan. Hak akses mereka tidak berubah.` : "Jabatan ini belum dipakai siapa pun.",
+    });
     if (!ok) return;
     onJobTitlesChange((prev) => prev.filter((x) => x.id !== j.id));
     persist(() => db.deleteJobTitle(j.id));

@@ -17,6 +17,7 @@ import ContentPlan from "@/components/ContentPlan";
 import WorkloadView from "@/components/WorkloadView";
 import Select from "@/components/Select";
 import BrandMark from "@/components/BrandMark";
+import { ToastHost, ConfirmHost, showToast, askConfirm, confirmDelete } from "@/components/Feedback";
 import { ROLE_LABEL, canManageWork } from "@/lib/roles";
 
 const COLUMNS = [
@@ -94,6 +95,17 @@ function Avatar({ profile, size = 20 }) {
     </span>
   );
 }
+
+// Isi panel detail tugas yang bisa diubah, untuk mendeteksi perubahan yang belum disimpan.
+function draftOf(t) {
+  if (!t) return "";
+  return JSON.stringify([
+    t.title, t.client, t.assignee || null, t.priority, t.due || "", t.start || "", t.column,
+    (t.subtasks || []).map((s) => [s.id, s.text, !!s.done, s.assignee || null, s.link || "", s.note || "", s.file?.path || null]),
+  ]);
+}
+
+const shortTitle = (t) => (t.length > 40 ? `${t.slice(0, 38)}…` : t);
 
 function StatusDot({ column }) {
   const col = COLUMN_BY_ID[column] || COLUMNS[0];
@@ -182,6 +194,12 @@ export default function AgencyTracker() {
   const [expandedSubtask, setExpandedSubtask] = useState(null);
   // Versi tugas saat panel dibuka. Saat simpan, hanya yang diubah dibanding versi ini yang ditulis.
   const editBaseRef = useRef(null);
+  // Isi panel saat dibuka (juga untuk tugas baru), pembanding "ada perubahan yang belum disimpan?".
+  const editOpenedRef = useRef(null);
+  const editingRef = useRef(null);
+  editingRef.current = editing;
+  // Tugas yang baru dihapus dan masih bisa di-urungkan: belum dihapus di database.
+  const pendingDeletesRef = useRef(new Set());
 
   async function loadBoard() {
     try {
@@ -190,7 +208,7 @@ export default function AgencyTracker() {
       setProfiles(board.profiles);
       setJobTitles(board.jobTitles);
       setCurrentUserId(board.currentUserId);
-      setTasks(board.tasks);
+      setTasks(board.tasks.filter((t) => !pendingDeletesRef.current.has(t.id)));
       setLoadError("");
     } catch (e) {
       setLoadError(e.message || "Gagal memuat data");
@@ -449,31 +467,47 @@ export default function AgencyTracker() {
     persist(() => db.setClientArchived(client.id, archived));
   }
 
-  function removeClient(client) {
+  async function removeClient(client) {
     const used = tasks.filter((t) => t.client === client.id).length;
     if (used > 0) {
       setClientError(`"${client.name}" masih punya ${used} tugas. Arsipkan saja, atau pindahkan/hapus tugasnya dulu.`);
       return;
     }
-    if (!window.confirm(`Hapus klien "${client.name}" secara permanen?`)) return;
+    if (!(await confirmDelete({ title: `Hapus klien "${client.name}"?`, body: "Klien ini akan dihapus permanen dari Traicker." }))) return;
     setClients((prev) => prev.filter((c) => c.id !== client.id));
     if (activeClient === client.id) setActiveClient("all");
     setClientError("");
     persist(() => db.deleteClientRow(client.id));
   }
 
+  // Hapus tugas bisa di-urungkan selama toast tampil (±8 detik); baru setelah itu dihapus di database.
   function deleteTask(id) {
     const task = tasks.find((t) => t.id === id);
+    if (!task) return;
+    pendingDeletesRef.current.add(id);
     setTasks((prev) => prev.filter((t) => t.id !== id));
     setModalOpen(false);
-    if (task) persist(() => db.deleteTask(task));
+    showToast({
+      message: `Tugas "${shortTitle(task.title)}" dihapus`,
+      actionLabel: "Urungkan",
+      onAction: () => {
+        pendingDeletesRef.current.delete(id);
+        setTasks((prev) => (prev.some((t) => t.id === id) ? prev : [...prev, task]));
+      },
+      onExpire: () => {
+        pendingDeletesRef.current.delete(id);
+        persist(() => db.deleteTask(task));
+      },
+    });
   }
 
   function openNew() {
     // ID dibuat di client supaya lampiran bisa langsung di-upload sebelum tugas disimpan.
     // Member yang membuat tugas otomatis jadi assignee-nya; admin bebas memilih.
     editBaseRef.current = null;
-    setEditing({ id: crypto.randomUUID(), isNew: true, title: "", client: activeClients[0]?.id, assignee: canManage ? null : currentUserId, createdBy: currentUserId, priority: "Sedang", due: todayStr, start: "", column: "todo", subtasks: [] });
+    const fresh = { id: crypto.randomUUID(), isNew: true, title: "", client: activeClients[0]?.id, assignee: canManage ? null : currentUserId, createdBy: currentUserId, priority: "Sedang", due: todayStr, start: "", column: "todo", subtasks: [] };
+    editOpenedRef.current = fresh;
+    setEditing(fresh);
     setNewSubtask("");
     setExpandedSubtask(null);
     setModalOpen(true);
@@ -481,6 +515,7 @@ export default function AgencyTracker() {
 
   function openEdit(task) {
     editBaseRef.current = task;
+    editOpenedRef.current = task;
     setEditing({ ...task, subtasks: task.subtasks ? task.subtasks.map((s) => ({ ...s })) : [] });
     setNewSubtask("");
     setExpandedSubtask(null);
@@ -518,8 +553,20 @@ export default function AgencyTracker() {
     persist(() => db.updateTaskDates(task.id, { due, start }));
   }
 
+  // Centang subtask yang sudah tersimpan langsung ditulis ke database (seperti menggeser kartu),
+  // tanpa menunggu tombol Simpan. Subtask yang baru ditambah di panel ikut tersimpan saat Simpan.
   function toggleSubtask(id) {
-    setEditing((prev) => ({ ...prev, subtasks: prev.subtasks.map((s) => (s.id === id ? { ...s, done: !s.done } : s)) }));
+    const sub = editing.subtasks.find((s) => s.id === id);
+    if (!sub) return;
+    const done = !sub.done;
+    const flip = (list) => list.map((s) => (s.id === id ? { ...s, done } : s));
+    setEditing((prev) => ({ ...prev, subtasks: flip(prev.subtasks) }));
+    const base = editBaseRef.current;
+    if (editing.isNew || !base?.subtasks?.some((s) => s.id === id)) return;
+    editBaseRef.current = { ...base, subtasks: flip(base.subtasks) };
+    if (editOpenedRef.current) editOpenedRef.current = { ...editOpenedRef.current, subtasks: flip(editOpenedRef.current.subtasks || []) };
+    setTasks((prev) => prev.map((t) => (t.id === editing.id ? { ...t, subtasks: flip(t.subtasks || []) } : t)));
+    persist(() => db.setSubtaskDone(id, done));
   }
 
   function updateSubtaskField(id, field, value) {
@@ -617,6 +664,32 @@ export default function AgencyTracker() {
   const subtaskWorkable = (s) => modalCanEdit || (!!currentUserId && s.assignee === currentUserId);
   const modalHasOwnSubtasks = !!editing && !modalCanEdit && (editing.subtasks || []).some(subtaskWorkable);
   const datesInvalid = !!editing && editing.column !== "ongoing" && !!editing.start && !!editing.due && editing.start > editing.due;
+  const drawerCanSave = !!editing && (modalCanEdit || modalHasOwnSubtasks) && !!editing.title.trim() && !datesInvalid;
+  const drawerStateRef = useRef({});
+  drawerStateRef.current = { canSave: drawerCanSave, save: saveTask };
+
+  // Esc, klik di luar panel, atau tombol ✕: kalau ada perubahan yang belum disimpan, tanya dulu.
+  // (Tombol Batal = sengaja membatalkan, jadi langsung ditutup.)
+  async function requestCloseDrawer() {
+    const draft = editingRef.current;
+    if (!draft || draftOf(draft) === draftOf(editOpenedRef.current)) {
+      setModalOpen(false);
+      return;
+    }
+    const { canSave, save } = drawerStateRef.current;
+    const choice = await askConfirm({
+      title: draft.isNew ? "Simpan tugas baru ini?" : "Simpan perubahan?",
+      body: draft.isNew ? "Tugas ini belum disimpan. Kalau ditutup sekarang, isiannya hilang." : "Ada perubahan di tugas ini yang belum disimpan.",
+      cancelId: "keep",
+      actions: [
+        { id: "discard", label: "Buang", tone: "secondary" },
+        { id: "keep", label: "Lanjut edit", tone: "secondary" },
+        ...(canSave ? [{ id: "save", label: "Simpan", tone: "primary" }] : []),
+      ],
+    });
+    if (choice === "save") drawerStateRef.current.save();
+    else if (choice === "discard") setModalOpen(false);
+  }
 
   // Esc menutup panel / dialog / popover yang sedang terbuka.
   useEffect(() => {
@@ -628,7 +701,7 @@ export default function AgencyTracker() {
       else if (passwordOpen) setPasswordOpen(false);
       else if (teamOpen) setTeamOpen(false);
       else if (clientModalOpen) setClientModalOpen(false);
-      else if (modalOpen) setModalOpen(false);
+      else if (modalOpen) requestCloseDrawer();
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -1280,7 +1353,7 @@ export default function AgencyTracker() {
       {/* ---------- Panel detail tugas ---------- */}
       {modalOpen && editing && (
         <>
-          <div className="scrim" onClick={() => setModalOpen(false)} />
+          <div className="scrim" onClick={requestCloseDrawer} />
           <aside className="drawer" role="dialog" aria-modal="true" aria-label={editing.isNew ? "Tugas baru" : "Detail tugas"}>
             <div className="drawer-head">
               <div className="crumbs">
@@ -1289,7 +1362,7 @@ export default function AgencyTracker() {
                 <Icon name="chevronRight" size={13} />
                 <span>{editing.isNew ? "Tugas baru" : COLUMN_BY_ID[editing.column]?.label}</span>
               </div>
-              <button className="btn btn-ghost btn-icon" onClick={() => setModalOpen(false)} aria-label="Tutup">
+              <button className="btn btn-ghost btn-icon" onClick={requestCloseDrawer} aria-label="Tutup">
                 <Icon name="x" />
               </button>
             </div>
@@ -1545,6 +1618,9 @@ export default function AgencyTracker() {
           </aside>
         </>
       )}
+
+      <ConfirmHost />
+      <ToastHost />
     </div>
   );
 }

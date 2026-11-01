@@ -1540,6 +1540,126 @@ textarea.field {
   animation: fade-in 0.2s var(--ease);
 }
 
+/* ---------- Konfirmasi & toast (components/Feedback.jsx) ---------- */
+.btn-danger {
+  background: var(--danger);
+  color: var(--surface);
+}
+
+.btn-danger:hover:not(:disabled) {
+  filter: brightness(0.94);
+}
+
+/* Di atas panel detail, dialog, dan menu dropdown. */
+.scrim.is-confirm {
+  z-index: 90;
+}
+
+.dialog-wrap.is-confirm {
+  z-index: 91;
+}
+
+.dialog.confirm {
+  max-width: 400px;
+  padding: 20px 20px 16px;
+  gap: 6px;
+}
+
+.confirm-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+.confirm-body {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+
+.confirm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.toast-stack {
+  position: fixed;
+  z-index: 95;
+  left: 50%;
+  bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  display: grid;
+  gap: 8px;
+  width: max-content;
+  max-width: calc(100vw - 32px);
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 42px;
+  padding: 6px 6px 6px 14px;
+  border-radius: var(--r);
+  background: var(--ink);
+  color: var(--on-ink);
+  box-shadow: var(--shadow-lg);
+  font-size: 13px;
+  animation: toast-in 0.24s var(--ease);
+}
+
+.toast-msg {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.toast-action {
+  flex-shrink: 0;
+  height: 30px;
+  padding: 0 10px;
+  border: none;
+  border-radius: var(--r-sm);
+  background: color-mix(in srgb, var(--on-ink) 14%, transparent);
+  color: var(--on-ink);
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.toast-action:hover {
+  background: color-mix(in srgb, var(--on-ink) 22%, transparent);
+}
+
+.toast-close {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: color-mix(in srgb, var(--on-ink) 70%, transparent);
+}
+
+.toast-close:hover {
+  color: var(--on-ink);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
 .drawer {
   position: fixed;
   z-index: 51;
@@ -4854,5 +4974,17 @@ textarea.field {
   /* Dua pilihan (jabatan & urutan) berdampingan, bukan satu melebar. */
   .wl .toolbar > .select:nth-child(2):last-child {
     grid-column: auto;
+  }
+}
+
+/* Toast & konfirmasi di HP */
+@media (max-width: 640px) {
+  .toast-stack {
+    bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .confirm-actions .btn {
+    flex: 1 1 auto;
+    height: 42px;
   }
 }

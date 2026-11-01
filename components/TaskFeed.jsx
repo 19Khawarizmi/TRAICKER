@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import * as db from "@/lib/trackerData";
 import Icon from "@/components/icons";
+import { confirmDelete } from "@/components/Feedback";
 
 // Komentar + riwayat aktivitas satu task, diperbarui realtime.
 
@@ -122,7 +123,7 @@ export default function TaskFeed({ taskId, field = "task_id", currentUserId, isA
   }
 
   async function remove(id) {
-    if (!window.confirm("Hapus komentar ini?")) return;
+    if (!(await confirmDelete({ title: "Hapus komentar ini?", body: "Komentar akan hilang dari riwayat untuk semua anggota." }))) return;
     try {
       await db.deleteComment(id);
       await load();
