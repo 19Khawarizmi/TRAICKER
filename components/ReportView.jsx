@@ -110,7 +110,10 @@ function defaultPeriod(kind, todayStr) {
   return kind === "weekly" ? shiftPeriod("weekly", weekKey(today), -1) : addMonths(monthKey(today), -1);
 }
 
-const fmtShortDate = (s) => new Date(s + "T00:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "short" });
+const fmtShortDate = (s) => {
+  const d = new Date(`${s}T00:00:00`);
+  return s && !Number.isNaN(d.getTime()) ? d.toLocaleDateString("id-ID", { day: "numeric", month: "short" }) : "—";
+};
 const fmtRange = (kind, key) => {
   const [start, end] = periodRange(kind, key);
   return `${fmtShortDate(start)} – ${new Date(end + "T00:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}`;
@@ -253,7 +256,7 @@ export default function ReportView({
   });
 
   if (!clientId) {
-    return <div className="cp-empty"><h3>Belum ada klien</h3><p>Tambahkan klien dulu lewat Kelola klien.</p></div>;
+    return <div className="cp-empty"><h2>Belum ada klien</h2><p>Tambahkan klien dulu lewat Kelola klien.</p></div>;
   }
 
   return (
@@ -321,19 +324,13 @@ export default function ReportView({
         </div>
       )}
 
-      {kind === "weekly" && missing.length > 0 && (
-        <div className="notice" style={{ margin: "0 0 12px" }}>
-          <Icon name="alert" size={14} />
-          <span>
-            {missing.length} konten tayang belum diisi angkanya:{" "}
-            {missing.map((p, i) => (
-              <React.Fragment key={p.id}>
-                {i > 0 && ", "}
-                <button className="rp-link" onClick={() => onOpen(p)}>{p.title}</button>
-              </React.Fragment>
-            ))}
-          </span>
-        </div>
+      {kind === "weekly" && curPosts.length > 0 && (
+        <WeeklyChecklist
+          missing={missing}
+          total={curPosts.length}
+          followersMissing={usedPlatformIds.filter((pid) => curPosts.some((p) => p.platform === pid) && !followersAt(followers, clientId, pid, "weekly", period)).map(platformOf)}
+          onOpen={onOpen}
+        />
       )}
 
       {kind === "weekly"
@@ -363,17 +360,17 @@ export default function ReportView({
 
       <section className="rp-grid2">
         <div className="rp-card">
-          <h3 className="rp-card-title">Konten terbaik {kind === "weekly" ? "minggu" : "bulan"} ini</h3>
+          <h2 className="rp-card-title">Konten terbaik {kind === "weekly" ? "minggu" : "bulan"} ini</h2>
           {top.length === 0 ? <p className="text-muted">Belum ada konten tayang dengan angka di periode ini.</p> : top.map((p) => <RankRow key={p.id} post={p} platform={platformOf(p.platform)} onOpen={onOpen} />)}
           {bottom.length > 0 && (
             <>
-              <h3 className="rp-card-title" style={{ marginTop: 16 }}>Paling rendah</h3>
+              <h2 className="rp-card-title" style={{ marginTop: 16 }}>Paling rendah</h2>
               {bottom.map((p) => <RankRow key={p.id} post={p} platform={platformOf(p.platform)} onOpen={onOpen} />)}
             </>
           )}
         </div>
         <div className="rp-card">
-          <h3 className="rp-card-title">Per format konten</h3>
+          <h2 className="rp-card-title">Per format konten</h2>
           {byFormat.length === 0 ? <p className="text-muted">Belum ada data.</p> : (
             <table className="rp-mini">
               <thead><tr><th>Format</th><th>Konten</th><th>Rata-rata reach</th><th>ER</th></tr></thead>
@@ -395,7 +392,7 @@ export default function ReportView({
 
       <section className="rp-grid2">
         <div className="rp-card">
-          <h3 className="rp-card-title">Kuota konten</h3>
+          <h2 className="rp-card-title">Kuota konten</h2>
           {quotaRows.length === 0 ? (
             <p className="text-muted">Belum ada kuota kontrak.{isAdmin ? " Atur lewat tombol Target & kuota." : ""}</p>
           ) : (
@@ -418,7 +415,7 @@ export default function ReportView({
         </div>
 
         <div className="rp-card">
-          <h3 className="rp-card-title">Target KPI</h3>
+          <h2 className="rp-card-title">Target KPI</h2>
           {kind === "weekly" ? (
             <p className="text-muted">Target KPI dihitung dari Insights per 3 dan 6 bulan. Lihat di report <button className="rp-link" onClick={() => changeKind("monthly")}>Bulanan</button>.</p>
           ) : clientTargets.length === 0 ? (
@@ -486,7 +483,7 @@ function WeeklyPlatform({ pf, rows, keys, record, periodEnd, period, onFollowers
     <section className="rp-platform">
       <header className="rp-platform-head">
         <span className="pf-badge" style={{ "--pf": pf.color }}>{pf.short}</span>
-        <h3>{pf.name}</h3>
+        <h2>{pf.name}</h2>
         <span className="text-muted">{cur.posts} konten tayang · {cur.measured} dengan angka</span>
       </header>
 
@@ -530,7 +527,7 @@ function WeeklyPlatform({ pf, rows, keys, record, periodEnd, period, onFollowers
         </div>
       </div>
 
-      <div className="rp-charts">
+      <TrendCharts unit="minggu" points={rows.filter((r) => r.measured).length}>
         <TrendChart
           title="Reach per minggu"
           kind="bar"
@@ -547,9 +544,10 @@ function WeeklyPlatform({ pf, rows, keys, record, periodEnd, period, onFollowers
           series={[{ id: pf.id, name: pf.name, color: pf.color, values: rows.map((r) => r.er) }]}
           format={(v) => fmtPct(v, 1)}
         />
-      </div>
+      </TrendCharts>
 
       <RecapTable
+        summary={`Lihat rekap ${keys.length} minggu`}
         title="Rekap mingguan"
         heads={keys.map((k) => periodLabel("weekly", k, "short"))}
         rows={[
@@ -580,7 +578,7 @@ function MonthlyOverview({ pf, period, keys, rows, postedInPlan, onChange }) {
     <section className="rp-platform">
       <header className="rp-platform-head">
         <span className="pf-badge" style={{ "--pf": pf.color }}>{pf.short}</span>
-        <h3>{pf.name} overview</h3>
+        <h2>{pf.name} overview</h2>
         <span className="text-muted">Data Insights {fmtRange("monthly", period)}</span>
       </header>
 
@@ -615,7 +613,7 @@ function MonthlyOverview({ pf, period, keys, rows, postedInPlan, onChange }) {
         </div>
       </div>
 
-      <div className="rp-charts">
+      <TrendCharts unit="bulan" points={rows.filter((r) => r?.reach != null).length}>
         <TrendChart
           title="Reach per bulan"
           kind="bar"
@@ -632,9 +630,10 @@ function MonthlyOverview({ pf, period, keys, rows, postedInPlan, onChange }) {
           series={[{ id: pf.id, name: pf.name, color: pf.color, values: rows.map((r) => insightEr(r)) }]}
           format={(v) => fmtPct(v, 1)}
         />
-      </div>
+      </TrendCharts>
 
       <RecapTable
+        summary={`Lihat rekap ${keys.length} bulan`}
         title="Rekap bulanan"
         heads={keys.map((k) => periodLabel("monthly", k, "short"))}
         rows={[
@@ -663,8 +662,69 @@ function PointDelta({ cur, prev }) {
   return <span className="rp-delta">{cur >= prev ? "▲" : "▼"} {((cur - prev) * 100).toLocaleString("id-ID", { maximumFractionDigits: 2 })} poin</span>;
 }
 
-function RecapTable({ title, heads, rows }) {
+// Grafik tren butuh minimal 2 titik data; sebelum itu cukup satu kalimat, bukan sumbu kosong.
+function TrendCharts({ unit, points, children }) {
+  if (points < 2) return <p className="rp-chart-empty">Grafik tren muncul setelah ada data minimal 2 {unit}.</p>;
+  return <div className="rp-charts">{children}</div>;
+}
+
+// Langkah report Senin: isi angka konten, isi followers, lalu export.
+function WeeklyChecklist({ missing, total, followersMissing, onOpen }) {
+  const contentDone = missing.length === 0;
+  const followersDone = followersMissing.length === 0;
+  const allDone = contentDone && followersDone;
   return (
+    <section className={`rp-todo ${allDone ? "is-done" : ""}`} aria-label="Langkah report minggu ini">
+      <h2 className="rp-todo-title">{allDone ? "Angka minggu ini sudah lengkap" : "Yang perlu diisi untuk report minggu ini"}</h2>
+      <ol className="rp-todo-list">
+        <li className={contentDone ? "is-done" : ""}>
+          <span className="rp-todo-mark" aria-hidden="true">{contentDone ? <Icon name="check" size={12} /> : "1"}</span>
+          <span>
+            {contentDone ? (
+              <>Angka performa {total} konten sudah diisi.</>
+            ) : (
+              <>
+                <b>{missing.length} konten</b> belum diisi angkanya:{" "}
+                {missing.map((p, i) => (
+                  <React.Fragment key={p.id}>
+                    {i > 0 && ", "}
+                    <button className="rp-link" onClick={() => onOpen(p)}>{p.title}</button>
+                  </React.Fragment>
+                ))}
+              </>
+            )}
+          </span>
+        </li>
+        <li className={followersDone ? "is-done" : ""}>
+          <span className="rp-todo-mark" aria-hidden="true">{followersDone ? <Icon name="check" size={12} /> : "2"}</span>
+          <span>
+            {followersDone ? (
+              <>Followers akhir minggu sudah diisi.</>
+            ) : (
+              <>
+                <b>Followers akhir minggu</b> belum diisi untuk{" "}
+                {followersMissing.map((pf, i) => (
+                  <React.Fragment key={pf.id}>
+                    {i > 0 && ", "}
+                    <button className="rp-link" onClick={() => document.getElementById(`fol-${pf.id}`)?.focus()}>{pf.name}</button>
+                  </React.Fragment>
+                ))}
+                .
+              </>
+            )}
+          </span>
+        </li>
+        <li>
+          <span className="rp-todo-mark" aria-hidden="true">3</span>
+          <span>Klik <b>Export mingguan</b> di kanan atas untuk mengunduh Excel.</span>
+        </li>
+      </ol>
+    </section>
+  );
+}
+
+function RecapTable({ title, heads, rows, summary }) {
+  const table = (
     <div className="rp-table-scroll">
       <table className="rp-table">
         <thead>
@@ -688,6 +748,13 @@ function RecapTable({ title, heads, rows }) {
         </tbody>
       </table>
     </div>
+  );
+  if (!summary) return table;
+  return (
+    <details className="rp-recap">
+      <summary>{summary}</summary>
+      {table}
+    </details>
   );
 }
 

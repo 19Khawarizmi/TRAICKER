@@ -71,9 +71,10 @@ export default function WorkloadView({ profiles, tasks, posts, todayStr, query, 
     <div className="wl">
       <section className="page-head">
         <div>
-          <p className="kicker-ws"><Icon name="users" size={12} /> Beban kerja tim</p>
           <h1 className="page-title">Siapa sedang mengerjakan apa</h1>
           <div className="page-meta">
+            <span className="meta-ws"><Icon name="users" size={12} />Beban kerja tim</span>
+            <span className="sep">·</span>
             <span className="mono">{items.length}</span> pekerjaan belum selesai
             {unassigned.length > 0 && (<><span className="sep">·</span><span className="apv is-warn">{unassigned.length} belum ditugaskan</span></>)}
           </div>
@@ -107,8 +108,7 @@ export default function WorkloadView({ profiles, tasks, posts, todayStr, query, 
 
       <div className="wl-wrap">
         <p className="wl-note">
-          Pekerjaan dihitung sampai selesai: tugas sampai pindah ke <b>Selesai</b>, subtask sampai dicentang, dan konten sampai masuk <b>Terjadwal</b>.
-          Tanggal di kanan adalah deadline tugas atau tanggal tayang konten.
+          Dihitung sampai tugas <b>Selesai</b>, subtask dicentang, atau konten masuk <b>Terjadwal</b>. Tanggal = deadline atau tanggal tayang.
         </p>
 
         <div className="wl-grid">
@@ -175,6 +175,7 @@ function PersonCard({ items, title, sub, avatar, expanded, onToggle, todayStr, c
                   </span>
                   <span className={`wl-item-date ${late ? "is-late" : ""}`}>
                     {it.date ? fmtDay(it.date) : "—"}
+                    {late && <span className="wl-late"> · lewat</span>}
                   </span>
                 </button>
               </li>

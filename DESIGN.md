@@ -9,7 +9,7 @@ colors:
   hover: "#ecebe5"
   ink: "#191917"
   ink-soft: "#44433e"
-  muted: "#86847d"
+  muted: "#6a6862"
   faint: "#b5b2aa"
   line: "#e6e3dc"
   line-strong: "#d6d2c8"
@@ -17,7 +17,7 @@ colors:
   brand-red: "#d4141c"
   danger: "#b4453f"
   danger-bg: "#f8eae8"
-  warn: "#a8660f"
+  warn: "#965a0b"
   warn-bg: "#faf0df"
   ok: "#1f7a5a"
   ok-bg: "#e5f1eb"
@@ -146,7 +146,7 @@ components:
 
 Traicker is a desk a team works at all day. Everything has a place, nothing shouts, and the surface itself stays quiet so the work on it can be read at a glance. Warm paper in light mode, neutral graphite in dark mode, dark ink, and hairline rules carry the whole interface; color appears only when it means something: a client's identity dot, a task's status, a missed deadline, or the red "ai" in the name.
 
-Density is moderate and operational. Pages open with a compact head (kicker, bold title, one line of counts) followed straight by the work: a board, a calendar, a table, a report, or cards per person. Components are calm and precise: small consistent corners, thin borders, short labels, and controls that look like controls without decoration. The owner explicitly rejects interfaces that feel "AI-generated" or cheap, and needs dark mode to be easy on the eyes for long sessions.
+Density is moderate and operational. Pages open with a compact head (bold title, then one meta line that starts with the workspace name and its counts, e.g. "Project · 6 tugas · 1 selesai") followed straight by the work: a board, a calendar, a table, a report, or cards per person. Components are calm and precise: small consistent corners, thin borders, short labels, and controls that look like controls without decoration. The owner explicitly rejects interfaces that feel "AI-generated" or cheap, and needs dark mode to be easy on the eyes for long sessions.
 
 **Key Characteristics:**
 - One typeface (Figtree) for everything; hierarchy comes from weight and size, never from a second family.
@@ -168,7 +168,8 @@ A restrained neutral system with a single brand red and a small semantic set; in
 - **Soft Sheet** (`surface-raised-soft`, dark: `dark-surface-raised-soft`): table headers, hover rows, quiet sub-panels.
 - **Tray Grey** (`sunken`, dark: `dark-sunken`): board columns, segmented control tracks, recessed areas.
 - **Ink** (`ink`, dark: `dark-ink`): primary text and the primary button fill. Dark-mode ink is deliberately below pure white to avoid glare.
-- **Soft Ink** (`ink-soft`), **Muted** (`muted`), **Faint** (`faint`): secondary text, labels and metadata, placeholders and disabled states.
+- **Soft Ink** (`ink-soft`) and **Muted** (`muted`): secondary text, labels, metadata, and input placeholders. Muted is tuned to ≥4.5:1 on paper and white.
+- **Faint** (`faint`): decorative icons, empty-state marks, and disabled states only; never for text someone needs to read.
 - **Hairline** (`line`) and **Rule** (`line-strong`): borders and dividers; Rule for input outlines and secondary buttons.
 
 ### Semantic
@@ -195,7 +196,8 @@ A restrained neutral system with a single brand red and a small semantic set; in
 - **Headline** (650, 24px, 1.2): the editable task/content title in the detail drawer.
 - **Title** (650, 20px, 1.2): dialog titles; month labels in calendar and report use 650 at 19–22px.
 - **Body** (400, 13–14px, 1.5): cards, tables, form fields, comments. Phones bump fields to 16px so iOS does not zoom.
-- **Label** (500, 11px, 0.05em, uppercase): kickers, column headers, list labels, report tile labels.
+- **Label** (500, 11px, 0.05em, uppercase): table column headers, list labels, report tile labels. Never placed above a page title.
+- **Panel title** (650, 15px, -0.015em, sentence case): report cards and checklists; platform sections in reports use 700 at 18px.
 
 ### Named Rules
 **The One Family Rule.** Figtree only. No serif display faces, no italics for emphasis, no monospace for numbers.
@@ -258,6 +260,13 @@ Calm and exact; they read as controls through fill and border, not decoration.
 - **Trigger:** matches its context (toolbar pill, form field, or borderless property row); a chevron rotates when open.
 - **Menu:** white sheet, 6px corners, Float shadow, rendered above everything; options carry a leading identity mark (avatar, client dot, platform badge, status dot) and a check on the selected one. Lists over 8 items get a search box. On phones the menu becomes a bottom sheet.
 
+### Feedback (toast & confirm)
+- **Undo toast:** dark ink bar at the bottom center (above the floating button on phones), message plus one action ("Urungkan") and a close button; destructive actions on tasks and content wait ~8s before they are committed.
+- **Confirm dialog:** Traicker's own small dialog (never the browser's `window.confirm`); title states the question, body states the consequence, buttons read as actions ("Hapus akun", "Buang", "Lanjut edit", "Simpan"). Initial focus sits on the safe choice. On phones it becomes a bottom sheet.
+
+### Report stat strip
+Platform metrics sit in one framed strip divided by hairlines (not separate boxes inside a box). Tile labels are 11px uppercase muted; values are 18–20px tabular. The Monday checklist ("Yang perlu diisi untuk report minggu ini") leads the weekly report; recap tables are folded behind "Lihat rekap…", and trend charts appear only once there are at least two data points.
+
 ### Navigation
 - **Sidebar items:** 32px rows, 13px text; the active item becomes a white sheet with the Lift shadow and a hairline ring. Counts sit right-aligned in muted tabular figures.
 - **Workspace switch & view switch:** segmented control in Tray Grey; the active tab becomes a white sheet.
@@ -270,7 +279,8 @@ A 9px ring in the status color that fills as work advances (empty for to-do, hal
 
 ### Do:
 - **Do** keep every surface neutral and let client, platform, status, and deadline colors be the only color on screen.
-- **Do** use Figtree at 700 with -0.03em tracking for page titles, and 11px uppercase labels with 0.05em tracking for kickers and headers.
+- **Do** use Figtree at 700 with -0.03em tracking for page titles, and 11px uppercase labels with 0.05em tracking for column headers and tile labels.
+- **Do** make every clickable card and table row reachable with Tab and openable with Enter, with a 2px Soft Ink focus outline.
 - **Do** use 6px corners for every box-like element and full rounding only for naturally round things.
 - **Do** reserve visible shadows for drawers, dialogs, popovers, and menus.
 - **Do** show numbers with tabular figures and show overdue dates in danger red.
@@ -281,3 +291,5 @@ A 9px ring in the status color that fills as work advances (empty for to-do, hal
 - **Don't** use Traicker Red for buttons, links, or status; it belongs to the brand mark and the "ai".
 - **Don't** use blue as a general accent; info blue is a status color only.
 - **Don't** add gradients anywhere except the logo.
+- **Don't** place a small uppercase label (kicker/eyebrow) above a heading; put the workspace name in the meta line instead.
+- **Don't** use red for "today" markers; red means overdue or brand.

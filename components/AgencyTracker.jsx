@@ -107,6 +107,17 @@ function draftOf(t) {
 
 const shortTitle = (t) => (t.length > 40 ? `${t.slice(0, 38)}…` : t);
 
+// Angka kecil di kanan menu sidebar, dengan keterangan untuk pembaca layar.
+function NavCount({ n, label }) {
+  if (!n) return null;
+  return (
+    <span className="nav-count">
+      <span aria-hidden="true">{n}</span>
+      <span className="sr-only">{label}</span>
+    </span>
+  );
+}
+
 function StatusDot({ column }) {
   const col = COLUMN_BY_ID[column] || COLUMNS[0];
   return <span className={`status-dot ${col.dot}`} style={{ color: col.color }} />;
@@ -729,6 +740,15 @@ export default function AgencyTracker() {
     : saveState === "saved" ? "Tersimpan"
     : saveState === "error" ? (saveError.includes("akses") || saveError.includes("hanya boleh") ? saveError : "Gagal menyimpan")
     : "";
+  // Angka di sidebar = pekerjaan yang belum selesai (bukan total), jadi diberi keterangan.
+  const clientOpenCount = (id) => (workspace === "content" ? contentCounts[id] : counts[id]) || 0;
+  const allOpenCount = workspace === "content"
+    ? Object.entries(contentCounts).filter(([id]) => !archivedClientIds.has(id)).reduce((s, [, n]) => s + n, 0)
+    : boardTasks.filter((t) => t.column !== "done").length;
+  const clientCountLabel = (n) => (workspace === "content" ? `${n} konten belum tayang` : `${n} tugas belum selesai`);
+  // Di Beban kerja tim, pilihan klien hanya filter; menu yang aktif tetap "Beban kerja tim".
+  const clientNavState = workspace === "workload" ? "is-filter" : "is-active";
+
   // Pilihan orang untuk dropdown (avatar + nama).
   const personOptions = profiles.map((p) => ({
     value: p.id,
@@ -746,7 +766,7 @@ export default function AgencyTracker() {
       <aside className={`sidebar ${navOpen ? "is-open" : ""}`} aria-label="Navigasi">
         <div className="brand">
           <BrandMark />
-          <div className="brand-name">Tr<em>ai</em>cker</div>
+          <div className="brand-name"><span aria-hidden="true">Tr<em>ai</em>cker</span><span className="sr-only">Traicker</span></div>
           <button className="btn btn-ghost btn-icon nav-close" onClick={() => setNavOpen(false)} aria-label="Tutup menu">
             <Icon name="x" />
           </button>
@@ -768,17 +788,17 @@ export default function AgencyTracker() {
             <Icon name="users" size={15} />
             <span className="nav-text">Beban kerja tim</span>
           </button>
-          <button className={`nav-item ${activeClient === "all" ? "is-active" : ""}`} onClick={() => { setActiveClient("all"); setNavOpen(false); }}>
+          <button className={`nav-item ${activeClient === "all" ? clientNavState : ""}`} onClick={() => { setActiveClient("all"); setNavOpen(false); }} title={clientCountLabel(allOpenCount)}>
             <Icon name="folder" size={15} />
             <span className="nav-text">Semua klien</span>
-            <span className="nav-count">{workspace === "content" ? Object.entries(contentCounts).filter(([id]) => !archivedClientIds.has(id)).reduce((s, [, n]) => s + n, 0) : boardTasks.filter((t) => t.column !== "done").length}</span>
+            {workspace !== "workload" && <NavCount n={allOpenCount} label={clientCountLabel(allOpenCount)} />}
           </button>
           <div className="nav-label">Klien</div>
           {activeClients.map((c) => (
-            <button key={c.id} className={`nav-item ${activeClient === c.id ? "is-active" : ""}`} onClick={() => { setActiveClient(c.id); setNavOpen(false); }} title={c.name}>
+            <button key={c.id} className={`nav-item ${activeClient === c.id ? clientNavState : ""}`} onClick={() => { setActiveClient(c.id); setNavOpen(false); }} title={`${c.name} · ${clientCountLabel(clientOpenCount(c.id))}`}>
               <span className="dot" style={{ background: c.color }} />
               <span className="nav-text">{c.short}</span>
-              <span className="nav-count">{(workspace === "content" ? contentCounts[c.id] : counts[c.id]) || ""}</span>
+              {workspace !== "workload" && <NavCount n={clientOpenCount(c.id)} label={clientCountLabel(clientOpenCount(c.id))} />}
             </button>
           ))}
         </nav>
@@ -813,7 +833,7 @@ export default function AgencyTracker() {
           </button>
           <div className="topbar-brand" aria-hidden="true">
             <BrandMark />
-            <span className="brand-name">Tr<em>ai</em>cker</span>
+            <span className="brand-name"><span aria-hidden="true">Tr<em>ai</em>cker</span><span className="sr-only">Traicker</span></span>
           </div>
           <label className="search">
             <Icon name="search" size={14} />
@@ -838,7 +858,7 @@ export default function AgencyTracker() {
             className="btn btn-ghost btn-icon"
             onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
             title={resolvedTheme === "dark" ? "Ganti ke mode terang" : "Ganti ke mode gelap"}
-            aria-label="Ganti tema"
+            aria-label={resolvedTheme === "dark" ? "Mode gelap aktif. Ganti ke mode terang" : "Mode terang aktif. Ganti ke mode gelap"}
           >
             <Icon name={resolvedTheme === "dark" ? "sun" : "moon"} />
           </button>
@@ -941,6 +961,8 @@ export default function AgencyTracker() {
               {viewClient ? viewClient.name : "Semua klien"}
             </h1>
             <div className="page-meta">
+              <span className="meta-ws"><Icon name="columns" size={12} />Project</span>
+              <span className="sep">·</span>
               <span className="mono">{visibleTasks.length}</span> tugas
               <span className="sep">·</span>
               <span className="mono">{doneCount}</span> selesai
@@ -1130,7 +1152,9 @@ export default function AgencyTracker() {
                             updateDropTarget(col.id, e.clientY < rect.top + rect.height / 2 ? t.id : nextId);
                           }}
                           onClick={() => openEdit(t)}
-                          style={{ animationDelay: `${Math.min(i, 8) * 25}ms` }}
+                          tabIndex={0}
+                          aria-label={`Buka tugas ${t.title}`}
+                          onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); openEdit(t); } }}
                         >
                           <div className="card-top">
                             <span className="client-tag">
@@ -1468,7 +1492,14 @@ export default function AgencyTracker() {
                   {editing.column === "ongoing" ? (
                     <span className="text-muted" style={{ fontSize: 12.5 }}>Tanpa tanggal — aktif sampai dipindahkan</span>
                   ) : (
-                    <input type="date" className="field mono" value={editing.due} onChange={(e) => setEditing({ ...editing, due: e.target.value })} disabled={!modalCanEdit} />
+                    <input
+                      type="date"
+                      className={`field mono ${editing.due && editing.column !== "done" && editing.due < todayStr ? "is-late" : ""}`}
+                      value={editing.due}
+                      onChange={(e) => setEditing({ ...editing, due: e.target.value })}
+                      disabled={!modalCanEdit}
+                      aria-label={editing.due && editing.column !== "done" && editing.due < todayStr ? "Deadline (sudah lewat)" : "Deadline"}
+                    />
                   )}
                 </div>
                 {datesInvalid && <div className="prop-hint" style={{ color: "var(--danger)" }}>Tanggal mulai harus sebelum atau sama dengan deadline.</div>}

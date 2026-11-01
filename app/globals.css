@@ -12,7 +12,7 @@
 
   --ink: #191917;
   --ink-2: #44433e;
-  --muted: #86847d;
+  --muted: #6a6862;
   --faint: #b5b2aa;
 
   --line: #e6e3dc;
@@ -34,7 +34,7 @@
 
   --danger: #b4453f;
   --danger-bg: #f8eae8;
-  --warn: #a8660f;
+  --warn: #965a0b;
   --warn-bg: #faf0df;
   --ok: #1f7a5a;
   --ok-bg: #e5f1eb;
@@ -337,7 +337,7 @@ button {
 }
 
 .field::placeholder {
-  color: var(--faint);
+  color: var(--muted);
 }
 
 .field:hover:not(:disabled) {
@@ -571,7 +571,7 @@ textarea.field {
 }
 
 .sel-search input::placeholder {
-  color: var(--faint);
+  color: var(--muted);
 }
 
 .sel-list {
@@ -865,6 +865,16 @@ textarea.field {
   color: var(--ink);
 }
 
+/* Filter klien yang sedang dipakai di halaman lintas ruang kerja (Beban kerja tim). */
+.nav-item.is-filter {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.nav-item.is-filter .dot {
+  box-shadow: 0 0 0 2px var(--surface), 0 0 0 3.5px currentColor;
+}
+
 .nav-item.is-active {
   background: var(--surface);
   color: var(--ink);
@@ -1005,7 +1015,7 @@ textarea.field {
 }
 
 .user-chip-role {
-  font-size: 10.5px;
+  font-size: 11px;
   color: var(--muted);
 }
 
@@ -1765,7 +1775,7 @@ textarea.field {
 }
 
 .title-input::placeholder {
-  color: var(--faint);
+  color: var(--muted);
 }
 
 .title-input:focus {
@@ -1817,6 +1827,11 @@ textarea.field {
 .prop-value .field:hover:not(:disabled) {
   background-color: var(--surface-2);
   border-color: var(--line);
+}
+
+.prop-value .field.is-late {
+  color: var(--danger);
+  font-weight: 600;
 }
 
 .prop-value .field:focus {
@@ -1979,7 +1994,7 @@ textarea.field {
 }
 
 .add-row input::placeholder {
-  color: var(--faint);
+  color: var(--muted);
 }
 
 .text-err {
@@ -2277,7 +2292,7 @@ textarea.field {
 }
 
 .wl-count.is-zero {
-  color: var(--faint);
+  color: var(--muted);
   font-weight: 500;
 }
 
@@ -2355,6 +2370,22 @@ textarea.field {
 .wl-item-date.is-late {
   color: var(--danger);
   font-weight: 600;
+}
+
+.wl-late {
+  font-weight: 500;
+}
+
+/* Kartu & baris yang bisa dibuka dengan keyboard (Tab lalu Enter). */
+.card:focus-visible,
+.cp-table tbody tr:focus-visible {
+  outline: 2px solid var(--ink-2);
+  outline-offset: 2px;
+}
+
+/* Tombol pindah kolom/tahap juga muncul saat kartu difokus keyboard (bukan hanya di layar sentuh). */
+.card:focus-within .card-move {
+  display: inline-flex;
 }
 
 .wl-more {
@@ -3215,8 +3246,8 @@ textarea.field {
   bottom: 0;
   width: 2px;
   margin-left: -1px;
-  background: var(--danger);
-  opacity: 0.7;
+  background: var(--ink-2);
+  opacity: 0.55;
   z-index: 1;
   pointer-events: none;
 }
@@ -3288,15 +3319,16 @@ textarea.field {
   font-size: 12.5px;
 }
 
-.kicker-ws {
+/* Nama ruang kerja di awal baris keterangan halaman ("Project · 6 tugas · …"). */
+.meta-ws {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  margin: 0 0 8px;
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+  gap: 5px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+.meta-ws .icon {
   color: var(--muted);
 }
 
@@ -3329,9 +3361,9 @@ textarea.field {
 
 .pf-badge.is-mini {
   min-width: 20px;
-  height: 15px;
+  height: 16px;
   padding: 0 3px;
-  font-size: 9px;
+  font-size: 10px;
 }
 
 .pf-format {
@@ -3397,7 +3429,7 @@ textarea.field {
   background: var(--surface-2);
 }
 
-.cp-empty h3 {
+.cp-empty h2 {
   margin: 0 0 4px;
   font-size: 15px;
   font-weight: 600;
@@ -3678,10 +3710,11 @@ textarea.field {
   margin-bottom: 14px;
 }
 
-.rp-platform-head h3 {
+.rp-platform-head h2 {
   margin: 0;
-  font-size: 16px;
-  font-weight: 600;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
 .rp-platform-head .text-muted {
@@ -3691,19 +3724,22 @@ textarea.field {
 .rp-tiles {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 10px;
-  margin-bottom: 16px;
+  margin-bottom: 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  overflow: hidden;
 }
 
+/* Garis pemisah lewat bayangan 1px di kanan & bawah tiap kotak; garis di tepi tertutup bingkai. */
 .rp-tile {
   display: grid;
   align-content: start;
   gap: 4px;
   min-width: 0;
-  padding: 10px 12px;
-  border-radius: var(--r-sm);
-  background: var(--surface-2);
-  border: 1px solid var(--line);
+  padding: 12px 14px;
+  background: var(--surface);
+  box-shadow: 1px 0 0 var(--line), 0 1px 0 var(--line);
 }
 
 .rp-tile-label {
@@ -3727,7 +3763,7 @@ textarea.field {
   min-width: 0;
   padding: 0 4px;
   margin: 0 -4px;
-  border: 1px dashed var(--line-strong);
+  border: 1px solid var(--line-strong);
   border-radius: 4px;
   background: var(--surface);
   font-family: var(--font-sans-stack);
@@ -3777,8 +3813,7 @@ textarea.field {
 }
 
 .rp-tile.is-computed {
-  background: var(--sunken);
-  border-style: dashed;
+  background: var(--surface-2);
 }
 
 .rp-charts {
@@ -3904,6 +3939,119 @@ textarea.field {
   text-align: left;
 }
 
+/* Langkah report Senin */
+.rp-todo {
+  margin: 0 0 18px;
+  padding: 14px 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+}
+
+.rp-todo.is-done {
+  border-color: color-mix(in srgb, var(--ok) 40%, var(--line));
+  background: var(--ok-bg);
+}
+
+.rp-todo-title {
+  margin: 0 0 10px;
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+}
+
+.rp-todo-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13.5px;
+  color: var(--ink-2);
+}
+
+.rp-todo-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  max-width: 80ch;
+}
+
+.rp-todo-list li.is-done {
+  color: var(--muted);
+}
+
+.rp-todo-mark {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  margin-top: 1px;
+  border-radius: 50%;
+  border: 1.5px solid var(--line-strong);
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-2);
+}
+
+.rp-todo-list li.is-done .rp-todo-mark {
+  border-color: var(--ok);
+  background: var(--ok);
+  color: var(--surface);
+}
+
+.rp-chart-empty {
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--r-sm);
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+/* Tabel rekap dilipat: dibuka hanya saat dibutuhkan. */
+.rp-recap > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-2);
+  cursor: pointer;
+  list-style: none;
+}
+
+.rp-recap > summary::-webkit-details-marker {
+  display: none;
+}
+
+.rp-recap > summary::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform 0.18s var(--ease);
+}
+
+.rp-recap[open] > summary::before {
+  transform: rotate(45deg);
+}
+
+.rp-recap[open] > summary {
+  margin-bottom: 8px;
+}
+
+.rp-recap > summary:focus-visible {
+  outline: 2px solid var(--ink-2);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
 .rp-grid2 {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -3925,12 +4073,12 @@ textarea.field {
 }
 
 .rp-card-title {
-  margin: 0 0 10px;
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--muted);
+  margin: 0 0 12px;
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+  text-wrap: balance;
 }
 
 .rp-quota {
@@ -4629,7 +4777,8 @@ textarea.field {
   }
 
   .agenda-day.is-today .agenda-date .mono {
-    color: var(--brand-accent, var(--ink));
+    color: var(--ink);
+    font-weight: 700;
   }
 
   .agenda-items {
@@ -4866,7 +5015,6 @@ textarea.field {
 
   .rp-tiles {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
   }
 
   .rp-tile-value,

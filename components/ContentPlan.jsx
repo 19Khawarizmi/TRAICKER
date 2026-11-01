@@ -413,9 +413,10 @@ export default function ContentPlan({
     <>
       <section className="page-head">
         <div>
-          <p className="kicker-ws"><Icon name="calendar" size={12} /> Content plan</p>
           <h1 className="page-title">{viewClient ? viewClient.name : "Semua klien"}</h1>
           <div className="page-meta">
+            <span className="meta-ws"><Icon name="calendar" size={12} />Content plan</span>
+            <span className="sep">·</span>
             <span className="mono">{visiblePosts.length}</span> konten
             <span className="sep">·</span>
             <span className="mono">{thisWeek}</span> minggu ini
@@ -473,7 +474,7 @@ export default function ContentPlan({
 
       {posts.length === 0 && view !== "report" && (
         <div className="cp-empty">
-          <h3>Mulai content plan pertamamu</h3>
+          <h2>Mulai content plan pertamamu</h2>
           <p>Buat konten untuk tiap klien: platform, jadwal tayang, brief, caption, dan link visual. Klik <b>Konten baru</b> di atas.</p>
         </div>
       )}
@@ -570,7 +571,7 @@ export default function ContentPlan({
                   const st = STAGE_BY_ID[p.status];
                   const isLate = p.date && p.date < todayStr && !["scheduled", "published"].includes(p.status);
                   return (
-                    <tr key={p.id} onClick={() => openEdit(p)}>
+                    <tr key={p.id} onClick={() => openEdit(p)} tabIndex={0} aria-label={`Buka konten ${p.title}`} onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); openEdit(p); } }}>
                       <td className={`mono ${isLate ? "is-late" : ""}`} style={{ whiteSpace: "nowrap" }}>
                         {p.date ? fmtDay(p.date, { weekday: "short", day: "numeric", month: "short" }) : "—"}
                         {p.time && <span className="cp-time"> {p.time}</span>}
@@ -648,6 +649,7 @@ export default function ContentPlan({
           onSave={savePost}
           onDelete={removePost}
           onClose={requestClosePost}
+          todayStr={todayStr}
         />
       )}
 
@@ -676,7 +678,9 @@ function PostCard({ post: p, index, platform, client, people, Avatar, todayStr, 
       onDragStart={(e) => { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", p.id); onDragStart(); }}
       onDragEnd={onDragEnd}
       onClick={onOpen}
-      style={{ animationDelay: `${Math.min(index, 8) * 25}ms` }}
+      tabIndex={0}
+      aria-label={`Buka konten ${p.title}`}
+      onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); onOpen(); } }}
     >
       <div className="card-top">
         <PlatformTag platform={platform} format={p.format} />
@@ -846,7 +850,7 @@ function ContentCalendar({ posts, cursor, setCursor, todayStr, platformOf, clien
 // ---------------------------------------------------------------------------------------------
 // Panel detail konten
 
-function PostDrawer({ editing, setEditing, onClose, saved, clients, platforms, posts, personOptions, currentUserId, isAdmin, canManage, canEditPost, canDeletePost, clientOf, platformOf, profileOf, Avatar, onSave, onDelete }) {
+function PostDrawer({ editing, setEditing, onClose, todayStr, saved, clients, platforms, posts, personOptions, currentUserId, isAdmin, canManage, canEditPost, canDeletePost, clientOf, platformOf, profileOf, Avatar, onSave, onDelete }) {
   const canEdit = editing.isNew || (!!saved && canEditPost(saved));
   const pf = platformOf(editing.platform);
   const set = (fields) => setEditing((prev) => ({ ...prev, ...fields }));
@@ -931,7 +935,14 @@ function PostDrawer({ editing, setEditing, onClose, saved, clients, platforms, p
 
             <div className="prop-label"><Icon name="calendar" size={14} />Tayang</div>
             <div className="prop-value cp-two">
-              <input type="date" className="field mono" value={editing.date} onChange={(e) => set({ date: e.target.value })} disabled={!canEdit} aria-label="Tanggal tayang" />
+              <input
+                type="date"
+                className={`field mono ${editing.date && editing.date < todayStr && !["scheduled", "published"].includes(editing.status) ? "is-late" : ""}`}
+                value={editing.date}
+                onChange={(e) => set({ date: e.target.value })}
+                disabled={!canEdit}
+                aria-label={editing.date && editing.date < todayStr && !["scheduled", "published"].includes(editing.status) ? "Tanggal tayang (sudah lewat, belum terjadwal)" : "Tanggal tayang"}
+              />
               <input type="time" className="field mono" value={editing.time} onChange={(e) => set({ time: e.target.value })} disabled={!canEdit} aria-label="Jam tayang" />
             </div>
 
