@@ -1106,7 +1106,7 @@ function PerformanceSection({ editing, saved, set, canEdit }) {
               inputMode="numeric"
               value={values[f.key] ?? ""}
               onChange={(e) => {
-                const raw = e.target.value.replace(/D/g, "");
+                const raw = e.target.value.replace(/\D/g, "");
                 set({ metrics: { ...values, [f.key]: raw === "" ? null : Number(raw) } });
               }}
               disabled={!canEdit}

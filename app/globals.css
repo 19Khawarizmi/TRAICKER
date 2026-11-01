@@ -3772,7 +3772,7 @@ textarea.field {
 
 .rp-tile-input::placeholder {
   font-size: 13px;
-  color: var(--faint);
+  color: var(--muted);
 }
 
 .rp-tile-input:focus {
