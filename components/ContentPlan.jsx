@@ -10,6 +10,8 @@ import TaskFeed from "@/components/TaskFeed";
 import ReportView from "@/components/ReportView";
 import Select from "@/components/Select";
 import { showToast, askConfirm, confirmDelete } from "@/components/Feedback";
+import { useDialogFocus } from "@/lib/useDialogFocus";
+import { stashDraft, readDraft, clearDraft } from "@/lib/drafts";
 import { METRIC_FIELDS, hasValues, engagementOf, actionsOf, erOf, fmtInt, fmtPct } from "@/lib/contentMetrics";
 
 // Ruang kerja Content plan: kalender, pipeline per tahap produksi, dan tabel.
@@ -36,6 +38,14 @@ function weekRange(todayStr) {
   const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6);
   return [ymd(start), ymd(end)];
 }
+
+function shiftDay(s, n) {
+  const d = new Date(s + "T00:00:00");
+  return ymd(new Date(d.getFullYear(), d.getMonth(), d.getDate() + n));
+}
+
+// Konten yang sudah tayang ditampilkan terbaru dulu, default hanya sekian hari terakhir.
+const RECENT_PUBLISHED_DAYS = 14;
 
 function ApprovalChip({ value, small }) {
   const a = APPROVAL_BY_ID[value] || APPROVALS[0];
@@ -77,7 +87,7 @@ function PlatformTag({ platform, format }) {
 export default function ContentPlan({
   active,
   clients, activeClients, activeClient, query, profiles, currentUserId, isAdmin, canManage, jobTitleOf, Avatar, profileOf, clientOf,
-  todayStr, persist, onCounts, onData, newTick, openPostRequest, platformDialogTick,
+  todayStr, persist, onCounts, onData, newTick, openPostRequest, platformDialogTick, onShow,
 }) {
   const [platforms, setPlatforms] = useState([]);
   const [posts, setPosts] = useState([]);
@@ -107,6 +117,9 @@ export default function ContentPlan({
   });
   const [platformDialog, setPlatformDialog] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [showAllPublished, setShowAllPublished] = useState(false);
+  // Klien yang dipilih untuk Report saat sidebar "Semua klien".
+  const [reportPick, setReportPick] = useState(null);
   const dragRef = useRef(null);
   dragRef.current = dragId;
 
@@ -234,6 +247,54 @@ export default function ContentPlan({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openPostRequest, loaded]);
 
+  // Draft konten yang belum disimpan dari sesi sebelumnya (logout otomatis, tab tertutup): tawarkan dibuka lagi.
+  const draftCheckedRef = useRef(false);
+  useEffect(() => {
+    if (!loaded || !currentUserId || draftCheckedRef.current) return;
+    draftCheckedRef.current = true;
+    const saved = readDraft(currentUserId, "post");
+    if (!saved) return;
+    const { draft, base, opened } = saved;
+    const current = draft.isNew ? null : posts.find((p) => p.id === draft.id);
+    if (!draft.isNew && !current) {
+      clearDraft(currentUserId, "post");
+      return;
+    }
+    (async () => {
+      const choice = await askConfirm({
+        title: "Lanjutkan konten yang belum disimpan?",
+        body: `Perubahan di "${shortTitle(draft.title.trim() || "Konten baru")}" belum sempat disimpan saat kamu terakhir keluar.`,
+        cancelId: "discard",
+        actions: [
+          { id: "discard", label: "Buang", tone: "secondary" },
+          { id: "open", label: "Buka lagi", tone: "primary" },
+        ],
+      });
+      if (choice !== "open") {
+        clearDraft(currentUserId, "post");
+        return;
+      }
+      editBaseRef.current = draft.isNew ? null : base || current;
+      editOpenedRef.current = opened || current;
+      setEditing(draft);
+      onShow?.();
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loaded, currentUserId]);
+
+  // Selama panel berisi perubahan yang belum disimpan, catat sebagai draft di browser ini.
+  useEffect(() => {
+    if (!currentUserId || !draftCheckedRef.current) return;
+    const timer = setTimeout(() => {
+      if (editing && postDraftOf(editing) !== postDraftOf(editOpenedRef.current)) {
+        stashDraft(currentUserId, "post", { draft: editing, base: editBaseRef.current, opened: editOpenedRef.current });
+      } else {
+        clearDraft(currentUserId, "post");
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [editing, currentUserId]);
+
   // Menu "Kelola platform" di sidebar.
   const firstPlatformTick = useRef(platformDialogTick);
   useEffect(() => {
@@ -258,7 +319,8 @@ export default function ContentPlan({
     const fresh = {
       id: crypto.randomUUID(),
       isNew: true,
-      client: activeClient !== "all" ? activeClient : activeClients[0]?.id,
+      // Saat "Semua klien", klien dipilih sendiri supaya tidak diam-diam masuk klien pertama.
+      client: activeClient !== "all" ? activeClient : "",
       platform: platform?.id,
       format: platform?.formats?.[0] || "",
       title: "",
@@ -400,6 +462,22 @@ export default function ContentPlan({
   const waiting = visiblePosts.filter((p) => p.approval === "waiting").length;
   const late = visiblePosts.filter((p) => p.date && p.date < todayStr && !["scheduled", "published"].includes(p.status)).length;
   const viewClient = activeClient === "all" ? null : clientOf(activeClient);
+  // Report selalu per klien: saat "Semua klien", pakai pilihan di Report atau klien pertama yang punya konten.
+  const reportClientId = activeClient !== "all"
+    ? activeClient
+    : reportPick || activeClients.find((c) => posts.some((p) => p.client === c.id))?.id || activeClients[0]?.id;
+  const headClient = view === "report" ? (reportClientId ? clientOf(reportClientId) : null) : viewClient;
+  // Pipeline & Tabel: kerjaan yang berjalan dulu (urut tanggal, yang lewat jadwal paling atas),
+  // lalu yang sudah tayang, terbaru dulu dan default hanya 14 hari terakhir supaya tidak menumpuk.
+  const ongoingPosts = visiblePosts.filter((p) => p.status !== "published");
+  const publishedAll = visiblePosts
+    .filter((p) => p.status === "published")
+    .sort((a, b) => (b.date || "").localeCompare(a.date || "") || (b.time || "").localeCompare(a.time || ""));
+  const recentFrom = todayStr ? shiftDay(todayStr, -RECENT_PUBLISHED_DAYS) : "";
+  const publishedRecent = publishedAll.filter((p) => !p.date || p.date >= recentFrom);
+  const publishedShown = showAllPublished ? publishedAll : publishedRecent;
+  const canTogglePublished = publishedAll.length > publishedRecent.length;
+  const publishedToggleLabel = showAllPublished ? `Tampilkan ${RECENT_PUBLISHED_DAYS} hari terakhir saja` : `Lihat semua yang tayang (${publishedAll.length})`;
   // Pilihan orang untuk dropdown (avatar + nama).
   const personOptions = profiles.map((p) => ({
     value: p.id,
@@ -413,15 +491,17 @@ export default function ContentPlan({
     <>
       <section className="page-head">
         <div>
-          <h1 className="page-title">{viewClient ? viewClient.name : "Semua klien"}</h1>
+          <h1 className="page-title">{headClient ? headClient.name : "Semua klien"}</h1>
           <div className="page-meta">
             <span className="meta-ws"><Icon name="calendar" size={12} />Content plan</span>
-            <span className="sep">·</span>
-            <span className="mono">{visiblePosts.length}</span> konten
-            <span className="sep">·</span>
-            <span className="mono">{thisWeek}</span> minggu ini
-            {waiting > 0 && (<><span className="sep">·</span><span className="apv is-warn">{waiting} menunggu klien</span></>)}
-            {late > 0 && (<><span className="sep">·</span><span className="attention-btn is-danger" style={{ cursor: "default" }}><span className="pulse" />{late} lewat jadwal</span></>)}
+            {view === "report" ? (
+              <span className="meta-item">Report per klien</span>
+            ) : (<>
+            <span className="meta-item"><span className="mono">{visiblePosts.length}</span> konten</span>
+            <span className="meta-item"><span className="mono">{thisWeek}</span> minggu ini</span>
+            {waiting > 0 && <span className="apv is-warn">{waiting} menunggu klien</span>}
+            {late > 0 && <span className="attention-btn is-danger" style={{ cursor: "default" }}><span className="pulse" />{late} lewat jadwal</span>}
+            </>)}
           </div>
         </div>
 
@@ -501,7 +581,8 @@ export default function ContentPlan({
       {view === "pipeline" && (
         <div className="board">
           {STAGES.map((stage) => {
-            const list = visiblePosts.filter((p) => p.status === stage.id);
+            const isPublished = stage.id === "published";
+            const list = isPublished ? publishedShown : ongoingPosts.filter((p) => p.status === stage.id);
             const isDrop = dragId && dropTarget === stage.id;
             return (
               <section
@@ -519,7 +600,7 @@ export default function ContentPlan({
                 <header className="column-head">
                   <span className={`status-dot ${stage.dot}`} style={{ color: stage.color }} />
                   <span className="column-title">{stage.label}</span>
-                  <span className="column-count">{list.length}</span>
+                  <span className="column-count">{isPublished ? publishedAll.length : list.length}</span>
                 </header>
                 <div className="column-body">
                   {list.map((p, i) => (
@@ -540,7 +621,16 @@ export default function ContentPlan({
                       onMove={(status) => patchPost(p, { status })}
                     />
                   ))}
-                  {list.length === 0 && <div className="empty-col">{isDrop ? "Lepas di sini" : "Kosong"}</div>}
+                  {list.length === 0 && (
+                    <div className="empty-col">
+                      {isDrop ? "Lepas di sini" : isPublished && publishedAll.length > 0 ? `Tidak ada yang tayang ${RECENT_PUBLISHED_DAYS} hari terakhir` : "Kosong"}
+                    </div>
+                  )}
+                  {isPublished && canTogglePublished && (
+                    <button className="btn btn-ghost btn-sm col-more" onClick={() => setShowAllPublished((v) => !v)}>
+                      {publishedToggleLabel}
+                    </button>
+                  )}
                 </div>
               </section>
             );
@@ -566,7 +656,32 @@ export default function ContentPlan({
                 </tr>
               </thead>
               <tbody>
-                {visiblePosts.map((p) => {
+                {[
+                  ongoingPosts.length > 0 && { group: "ongoing", label: "Belum tayang", count: ongoingPosts.length },
+                  ...ongoingPosts,
+                  publishedAll.length > 0 && { group: "published", label: "Sudah tayang", count: publishedAll.length },
+                  ...publishedShown,
+                  canTogglePublished && { group: "toggle" },
+                ].filter(Boolean).map((p) => {
+                  if (p.group === "toggle") {
+                    return (
+                      <tr key="toggle" className="cp-group-row">
+                        <td colSpan={9}>
+                          <button className="btn btn-ghost btn-sm" onClick={() => setShowAllPublished((v) => !v)}>{publishedToggleLabel}</button>
+                        </td>
+                      </tr>
+                    );
+                  }
+                  if (p.group) {
+                    return (
+                      <tr key={p.group} className="cp-group-row">
+                        <td colSpan={9} className="cp-group-label">
+                          {p.label} <span className="mono">{p.count}</span>
+                          {p.group === "published" && !showAllPublished && canTogglePublished && <span className="cp-group-note">{RECENT_PUBLISHED_DAYS} hari terakhir</span>}
+                        </td>
+                      </tr>
+                    );
+                  }
                   const pf = platformOf(p.platform);
                   const st = STAGE_BY_ID[p.status];
                   const isLate = p.date && p.date < todayStr && !["scheduled", "published"].includes(p.status);
@@ -624,6 +739,8 @@ export default function ContentPlan({
           setTargets={setTargets}
           setQuotas={setQuotas}
           setInsights={setInsights}
+          clientId={reportClientId}
+          onPickClient={setReportPick}
         />
       )}
 
@@ -711,7 +828,7 @@ function PostCard({ post: p, index, platform, client, people, Avatar, todayStr, 
         {p.date ? (
           <span className={`due ${isLate ? "is-late" : ""} ${p.status === "published" ? "is-done" : ""}`}>
             <Icon name="calendar" size={12} />
-            {fmtDay(p.date, { day: "numeric", month: "short" })}{p.time ? ` · ${p.time}` : ""}
+            {fmtDay(p.date, { day: "numeric", month: "short" })}{p.time && <span className="card-time">{p.time}</span>}
           </span>
         ) : (
           <span className="due"><Icon name="calendar" size={12} />Belum dijadwalkan</span>
@@ -753,10 +870,10 @@ function ContentCalendar({ posts, cursor, setCursor, todayStr, platformOf, clien
         onDragStart={(e) => { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", p.id); setDragId(p.id); }}
         onDragEnd={() => { setDragId(null); setDropTarget(null); }}
         onClick={(e) => { e.stopPropagation(); onOpen(p); }}
-        title={`${pf?.name || ""} ${p.format || ""} · ${p.title} · ${clientOf(p.client).name}`}
+        title={`${p.title}\n${p.time ? `Jam ${p.time}, ` : ""}${pf?.name || ""} ${p.format || ""}, ${clientOf(p.client).name}`}
       >
+        {/* Jam tayang tidak ditulis di kotak tanggal supaya judul muat; jam ada di tooltip & panel detail. */}
         <span className="pf-badge is-mini" style={{ "--pf": pf?.color || "#888" }}>{pf?.short || "?"}</span>
-        {!compact && p.time && <span className="cp-time">{p.time}</span>}
         <span className="calendar-chip-text">{p.title}</span>
         {compact && <span className="agenda-client">{clientOf(p.client).short}</span>}
       </button>
@@ -825,7 +942,7 @@ function ContentCalendar({ posts, cursor, setCursor, todayStr, platformOf, clien
                   {byDay[key].map((p) => (
                     <button key={p.id} className="calendar-chip cp-agenda-chip" style={{ "--chip": platformOf(p.platform)?.color || "#888" }} onClick={() => onOpen(p)}>
                       <span className="pf-badge is-mini" style={{ "--pf": platformOf(p.platform)?.color || "#888" }}>{platformOf(p.platform)?.short || "?"}</span>
-                      <span className="agenda-text">{p.time ? `${p.time} · ` : ""}{p.title}</span>
+                      <span className="agenda-text">{p.time && <span className="agenda-time mono">{p.time}</span>}{p.title}</span>
                       <span className="agenda-client">{clientOf(p.client).short}</span>
                     </button>
                   ))}
@@ -860,15 +977,17 @@ function PostDrawer({ editing, setEditing, onClose, todayStr, saved, clients, pl
   const holdsIt = canManage || editing.specialist === currentUserId || editing.designer === currentUserId;
   const pillars = [...new Set(posts.map((p) => p.pillar).filter(Boolean))].sort();
   const stage = STAGE_BY_ID[editing.status];
+  const drawerRef = useRef(null);
+  useDialogFocus(drawerRef, true, editing.isNew ? ".title-input" : null);
 
   return (
     <>
       <div className="scrim" onClick={onClose} />
-      <aside className="drawer" role="dialog" aria-modal="true" aria-label={editing.isNew ? "Konten baru" : "Detail konten"}>
+      <aside ref={drawerRef} tabIndex={-1} className="drawer" role="dialog" aria-modal="true" aria-label={editing.isNew ? "Konten baru" : "Detail konten"}>
         <div className="drawer-head">
           <div className="crumbs">
-            <span className="dot" style={{ background: clientOf(editing.client).color }} />
-            <strong>{clientOf(editing.client).name || "Klien"}</strong>
+            <span className="dot" style={{ background: editing.client ? clientOf(editing.client).color : "var(--line-strong)" }} />
+            <strong>{editing.client ? clientOf(editing.client).name : "Pilih klien"}</strong>
             <Icon name="chevronRight" size={13} />
             <span>{editing.isNew ? "Konten baru" : stage?.label}</span>
           </div>
@@ -891,7 +1010,6 @@ function PostDrawer({ editing, setEditing, onClose, todayStr, saved, clients, pl
             onKeyDown={(e) => { if (e.key === "Enter") e.preventDefault(); }}
             disabled={!canEdit}
             placeholder="Judul konten, mis. Countdown 7 hari"
-            autoFocus={editing.isNew}
           />
 
           <div className="props">
@@ -903,10 +1021,11 @@ function PostDrawer({ editing, setEditing, onClose, todayStr, saved, clients, pl
 
             <div className="prop-label"><Icon name="folder" size={14} />Klien</div>
             <div className="prop-value">
-              <span className="dot" style={{ background: clientOf(editing.client).color }} />
+              <span className="dot" style={{ background: editing.client ? clientOf(editing.client).color : "var(--line-strong)" }} />
               <Select
                 variant="prop"
                 triggerLeading={false}
+                placeholder="Pilih klien"
                 value={editing.client}
                 onChange={(client) => set({ client })}
                 disabled={!canEdit}
@@ -1067,6 +1186,9 @@ function PostDrawer({ editing, setEditing, onClose, todayStr, saved, clients, pl
             </button>
           )}
           <span className="grow" />
+          {canEdit && holdsIt && (!editing.title.trim() || !editing.client || !editing.platform) && (
+            <span className="drawer-hint">{!editing.title.trim() ? "Isi judul konten dulu" : !editing.client ? "Pilih klien dulu" : "Pilih platform dulu"}</span>
+          )}
           <button className="btn btn-secondary" onClick={() => setEditing(null)}>{canEdit ? "Batal" : "Tutup"}</button>
           {canEdit && (
             <button className="btn btn-primary" onClick={onSave} disabled={!editing.title.trim() || !editing.platform || !editing.client || !holdsIt}>
@@ -1118,7 +1240,7 @@ function PerformanceSection({ editing, saved, set, canEdit }) {
       <div className="cp-metric-sum">
         <span>Engagement <b className="mono">{filled ? fmtInt(engagementOf(editing)) : "—"}</b></span>
         <span>ER <b className="mono">{fmtPct(erOf(editing), 2)}</b></span>
-        <span>Aksi <b className="mono">{filled ? fmtInt(actionsOf(editing)) : "—"}</b></span>
+        <span title="Aksi = klik link + follow dari konten ini">Aksi (klik + follow) <b className="mono">{filled ? fmtInt(actionsOf(editing)) : "—"}</b></span>
       </div>
       <label className="cp-boost">
         <input type="checkbox" checked={!!editing.boosted} onChange={(e) => set({ boosted: e.target.checked })} disabled={!canEdit} />
@@ -1239,7 +1361,7 @@ function PlatformDialog({ platforms, posts, onClose, onChange, save }) {
                   <span className="pf-badge" style={{ "--pf": p.color }}>{p.short}</span>
                   <div className="info">
                     <div className="name">{p.name}</div>
-                    <div className="sub">{p.formats.join(" · ") || "Belum ada format"}{p.charLimit ? ` · maks ${p.charLimit.toLocaleString("id-ID")} karakter` : ""} · {used} konten</div>
+                    <div className="sub meta-row"><span>{p.formats.join(", ") || "Belum ada format"}</span>{p.charLimit ? <span>Maks {p.charLimit.toLocaleString("id-ID")} karakter</span> : null}<span>{used} konten</span></div>
                   </div>
                   <button className="btn btn-ghost btn-icon btn-sm" onClick={() => startEdit(p)} aria-label={`Ubah ${p.name}`} title="Ubah"><Icon name="edit" size={14} /></button>
                   <button className="btn btn-ghost btn-icon btn-sm" onClick={() => toggleArchive(p)} aria-label={p.archived ? "Pulihkan" : "Arsipkan"} title={p.archived ? "Pulihkan" : "Arsipkan"}><Icon name={p.archived ? "restore" : "archive"} size={14} /></button>

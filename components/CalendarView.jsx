@@ -87,7 +87,7 @@ export default function CalendarView({ tasks, todayStr, clientOf, isOverdue, can
                       onDragStart={(e) => { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", t.id); setDragId(t.id); }}
                       onDragEnd={() => { setDragId(null); setOverDay(null); }}
                       onClick={() => onOpen(t)}
-                      title={`${c.name} · ${t.title}`}
+                      title={`${t.title} (${c.name})`}
                     >
                       <span className="dot" style={{ background: c.color, width: 6, height: 6 }} />
                       <span className="calendar-chip-text">{t.title}</span>

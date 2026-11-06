@@ -44,7 +44,7 @@ function describe(item, { columnLabel, personName, clientName, platformName, app
     case "schedule": return m.date ? <>menjadwalkan tayang ke <b>{fmtDay(m.date)}{m.time ? `, ${String(m.time).slice(0, 5)}` : ""}</b></> : "menghapus jadwal tayang";
     case "specialist": return m.to ? <>menugaskan sosmed specialist <b>{personName(m.to)}</b></> : "menghapus sosmed specialist";
     case "designer": return m.to ? <>menugaskan desainer/kreatif <b>{personName(m.to)}</b></> : "menghapus desainer/kreatif";
-    case "platform": return <>mengubah platform ke <b>{platformName(m.platform)}{m.format ? ` · ${m.format}` : ""}</b></>;
+    case "platform": return <>mengubah platform ke <b>{platformName(m.platform)}{m.format ? ` ${m.format}` : ""}</b></>;
     case "metrics": return m.reach != null ? <>memperbarui metrik performa (reach <b>{Number(m.reach).toLocaleString("id-ID")}</b>)</> : "memperbarui metrik performa";
     case "subtask_added": return <>menambah subtask {q(m.text)}</>;
     case "subtask_done": return <>menyelesaikan {q(m.text)}</>;
@@ -189,7 +189,7 @@ export default function TaskFeed({ taskId, field = "task_id", currentUserId, isA
                 <div className="feed-meta">
                   <b>{person?.name || "Anggota yang sudah dihapus"}</b>
                   <span className="feed-time" title={new Date(item.at).toLocaleString("id-ID")}>
-                    {timeAgo(item.at)}{item.edited ? " · diedit" : ""}
+                    {timeAgo(item.at)}{item.edited ? " (diedit)" : ""}
                   </span>
                   {!editing && (mine || isAdmin) && (
                     <span className="feed-actions">

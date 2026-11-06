@@ -73,11 +73,49 @@ typography:
     fontSize: "13px"
     fontWeight: 400
     fontFeature: "tnum"
+  section:
+    fontFamily: "Figtree, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "18px"
+    fontWeight: 700
+  brand:
+    fontFamily: "Figtree, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "19px"
+    fontWeight: 700
+  input-touch:
+    fontFamily: "Figtree, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "16px"
+    fontWeight: 400
+  panel-title:
+    fontFamily: "Figtree, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "15px"
+    fontWeight: 650
+  ui-large:
+    fontFamily: "Figtree, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "14px"
+    fontWeight: 500
+  ui:
+    fontFamily: "Figtree, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "12.5px"
+    fontWeight: 400
+  caption:
+    fontFamily: "Figtree, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "12px"
+    fontWeight: 400
+  meta:
+    fontFamily: "Figtree, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "11.5px"
+    fontWeight: 400
+  badge:
+    fontFamily: "Figtree, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "10px"
+    fontWeight: 600
 rounded:
   sm: "6px"
   md: "6px"
   lg: "6px"
   inner: "4px"
+  logo: "8px"
+  sheet: "14px"
   full: "999px"
 spacing:
   xs: "4px"
@@ -146,7 +184,7 @@ components:
 
 Traicker is a desk a team works at all day. Everything has a place, nothing shouts, and the surface itself stays quiet so the work on it can be read at a glance. Warm paper in light mode, neutral graphite in dark mode, dark ink, and hairline rules carry the whole interface; color appears only when it means something: a client's identity dot, a task's status, a missed deadline, or the red "ai" in the name.
 
-Density is moderate and operational. Pages open with a compact head (bold title, then one meta line that starts with the workspace name and its counts, e.g. "Project · 6 tugas · 1 selesai") followed straight by the work: a board, a calendar, a table, a report, or cards per person. Components are calm and precise: small consistent corners, thin borders, short labels, and controls that look like controls without decoration. The owner explicitly rejects interfaces that feel "AI-generated" or cheap, and needs dark mode to be easy on the eyes for long sessions.
+Density is moderate and operational. Pages open with a compact head (bold title, then one meta line that starts with the workspace name and its counts, e.g. "Project   6 tugas   1 selesai", the parts separated by space alone) followed straight by the work: a board, a calendar, a table, a report, or cards per person. Components are calm and precise: small consistent corners, thin borders, short labels, and controls that look like controls without decoration. The owner explicitly rejects interfaces that feel "AI-generated" or cheap, and needs dark mode to be easy on the eyes for long sessions.
 
 **Key Characteristics:**
 - One typeface (Figtree) for everything; hierarchy comes from weight and size, never from a second family.
@@ -292,4 +330,5 @@ A 9px ring in the status color that fills as work advances (empty for to-do, hal
 - **Don't** use blue as a general accent; info blue is a status color only.
 - **Don't** add gradients anywhere except the logo.
 - **Don't** place a small uppercase label (kicker/eyebrow) above a heading; put the workspace name in the meta line instead.
+- **Don't** use the middle dot (·) as a separator anywhere, in UI text or tooltips. Separate parts with spacing, a comma, or a new line; the owner reads it as an AI-generated tell.
 - **Don't** use red for "today" markers; red means overdue or brand.

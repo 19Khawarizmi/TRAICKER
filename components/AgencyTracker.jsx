@@ -17,6 +17,8 @@ import ContentPlan from "@/components/ContentPlan";
 import WorkloadView from "@/components/WorkloadView";
 import Select from "@/components/Select";
 import BrandMark from "@/components/BrandMark";
+import { useDialogFocus } from "@/lib/useDialogFocus";
+import { stashDraft, readDraft, clearDraft } from "@/lib/drafts";
 import { ToastHost, ConfirmHost, showToast, askConfirm, confirmDelete } from "@/components/Feedback";
 import { ROLE_LABEL, canManageWork } from "@/lib/roles";
 
@@ -70,7 +72,8 @@ function slugify(s) {
   return s.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "").slice(0, 24) || "klien";
 }
 
-const AVATAR_COLORS = ["#0E7C7B", "#3D6FA6", "#8B6A3F", "#5A7D3A", "#C97A1A", "#5B4EA8", "#B4453F", "#6B6A64"];
+// Semua warna avatar ≥4.5:1 terhadap inisial putih.
+const AVATAR_COLORS = ["#0E7C7B", "#3D6FA6", "#8B6A3F", "#5A7D3A", "#A3620F", "#5B4EA8", "#B4453F", "#6B6A64"];
 
 function avatarColor(id) {
   let h = 0;
@@ -89,7 +92,7 @@ function Avatar({ profile, size = 20 }) {
     <span
       className="avatar"
       title={`${profile.name} (${profile.email})`}
-      style={{ width: size, height: size, background: avatarColor(profile.id), fontSize: Math.round(size * 0.42) }}
+      style={{ width: size, height: size, background: avatarColor(profile.id), fontSize: Math.max(10, Math.round(size * 0.42)) }}
     >
       {initials(profile.name)}
     </span>
@@ -375,7 +378,7 @@ export default function AgencyTracker() {
   // Admin & manager boleh membuat, mengedit, dan menugaskan semua pekerjaan.
   const canManage = canManageWork(me?.role);
   const jobTitleOf = (id) => jobTitles.find((j) => j.id === id)?.name || "";
-  const roleLine = (p) => (p ? [ROLE_LABEL[p.role] || "Member", jobTitleOf(p.jobTitleId)].filter(Boolean).join(" · ") : "");
+  const roleLine = (p) => (p ? [ROLE_LABEL[p.role] || "Member", jobTitleOf(p.jobTitleId)].filter(Boolean).join(", ") : "");
   const canEditTask = (t) => canManage || (!!currentUserId && t.assignee === currentUserId);
   const canDeleteTask = (t) => isAdmin || (!!currentUserId && t.createdBy === currentUserId);
   const canWorkOnSubtask = (t, s) => canEditTask(t) || (!!currentUserId && s.assignee === currentUserId);
@@ -515,8 +518,9 @@ export default function AgencyTracker() {
   function openNew() {
     // ID dibuat di client supaya lampiran bisa langsung di-upload sebelum tugas disimpan.
     // Member yang membuat tugas otomatis jadi assignee-nya; admin bebas memilih.
+    // Klien mengikuti sidebar; saat "Semua klien", dipilih sendiri supaya tidak diam-diam masuk klien pertama.
     editBaseRef.current = null;
-    const fresh = { id: crypto.randomUUID(), isNew: true, title: "", client: activeClients[0]?.id, assignee: canManage ? null : currentUserId, createdBy: currentUserId, priority: "Sedang", due: todayStr, start: "", column: "todo", subtasks: [] };
+    const fresh = { id: crypto.randomUUID(), isNew: true, title: "", client: activeClient !== "all" ? activeClient : "", assignee: canManage ? null : currentUserId, createdBy: currentUserId, priority: "Sedang", due: todayStr, start: "", column: "todo", subtasks: [] };
     editOpenedRef.current = fresh;
     setEditing(fresh);
     setNewSubtask("");
@@ -675,9 +679,63 @@ export default function AgencyTracker() {
   const subtaskWorkable = (s) => modalCanEdit || (!!currentUserId && s.assignee === currentUserId);
   const modalHasOwnSubtasks = !!editing && !modalCanEdit && (editing.subtasks || []).some(subtaskWorkable);
   const datesInvalid = !!editing && editing.column !== "ongoing" && !!editing.start && !!editing.due && editing.start > editing.due;
-  const drawerCanSave = !!editing && (modalCanEdit || modalHasOwnSubtasks) && !!editing.title.trim() && !datesInvalid;
+  const drawerCanSave = !!editing && (modalCanEdit || modalHasOwnSubtasks) && !!editing.title.trim() && !!editing.client && !datesInvalid;
+  // Alasan tombol Simpan belum aktif, ditampilkan di sebelahnya.
+  const drawerMissing = !editing || !modalCanEdit ? "" : !editing.title.trim() ? "Isi judul tugas dulu" : !editing.client ? "Pilih klien dulu" : "";
   const drawerStateRef = useRef({});
   drawerStateRef.current = { canSave: drawerCanSave, save: saveTask };
+  const drawerRef = useRef(null);
+  useDialogFocus(drawerRef, modalOpen && !!editing, editing?.isNew ? ".title-input" : null);
+
+  // Draft tugas yang belum disimpan dari sesi sebelumnya (logout otomatis, tab tertutup): tawarkan dibuka lagi.
+  const draftCheckedRef = useRef(false);
+  useEffect(() => {
+    if (!loaded || !currentUserId || draftCheckedRef.current) return;
+    draftCheckedRef.current = true;
+    const saved = readDraft(currentUserId, "task");
+    if (!saved) return;
+    const { draft, base, opened } = saved;
+    const current = draft.isNew ? null : tasks.find((t) => t.id === draft.id);
+    if (!draft.isNew && !current) {
+      clearDraft(currentUserId, "task");
+      return;
+    }
+    (async () => {
+      const choice = await askConfirm({
+        title: "Lanjutkan tugas yang belum disimpan?",
+        body: `Perubahan di "${shortTitle(draft.title.trim() || "Tugas baru")}" belum sempat disimpan saat kamu terakhir keluar.`,
+        cancelId: "discard",
+        actions: [
+          { id: "discard", label: "Buang", tone: "secondary" },
+          { id: "open", label: "Buka lagi", tone: "primary" },
+        ],
+      });
+      if (choice !== "open") {
+        clearDraft(currentUserId, "task");
+        return;
+      }
+      editBaseRef.current = draft.isNew ? null : base || current;
+      editOpenedRef.current = opened || current;
+      setEditing(draft);
+      setNewSubtask("");
+      setExpandedSubtask(null);
+      setModalOpen(true);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loaded, currentUserId]);
+
+  // Selama panel berisi perubahan yang belum disimpan, catat sebagai draft di browser ini.
+  useEffect(() => {
+    if (!currentUserId || !draftCheckedRef.current) return;
+    const timer = setTimeout(() => {
+      if (modalOpen && editing && draftOf(editing) !== draftOf(editOpenedRef.current)) {
+        stashDraft(currentUserId, "task", { draft: editing, base: editBaseRef.current, opened: editOpenedRef.current });
+      } else {
+        clearDraft(currentUserId, "task");
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [editing, modalOpen, currentUserId]);
 
   // Esc, klik di luar panel, atau tombol ✕: kalau ada perubahan yang belum disimpan, tanya dulu.
   // (Tombol Batal = sengaja membatalkan, jadi langsung ditutup.)
@@ -718,6 +776,30 @@ export default function AgencyTracker() {
     return () => window.removeEventListener("keydown", onKey);
   }, [attentionOpen, userMenuOpen, navOpen, passwordOpen, teamOpen, clientModalOpen, modalOpen]);
 
+  // Shortcut keyboard: N = tugas/konten baru, / = ke kolom cari.
+  // Tidak aktif saat sedang mengetik atau saat ada panel/dialog terbuka.
+  const searchRef = useRef(null);
+  const shortcutRef = useRef(null);
+  shortcutRef.current = { workspace, openNew };
+  useEffect(() => {
+    function onKey(e) {
+      if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.target?.closest?.("input, textarea, select, [contenteditable='true'], [role='listbox']")) return;
+      if (document.querySelector("[aria-modal='true']")) return;
+      if (e.key === "/") {
+        e.preventDefault();
+        searchRef.current?.focus();
+      } else if (e.key === "n" || e.key === "N") {
+        e.preventDefault();
+        const { workspace: ws, openNew: newTask } = shortcutRef.current;
+        if (ws === "content") setContentNewTick((t) => t + 1);
+        else newTask();
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   if (!loaded) return <Splash label="Menyiapkan papan…" />;
 
   if (loadError) {
@@ -746,8 +828,12 @@ export default function AgencyTracker() {
     ? Object.entries(contentCounts).filter(([id]) => !archivedClientIds.has(id)).reduce((s, [, n]) => s + n, 0)
     : boardTasks.filter((t) => t.column !== "done").length;
   const clientCountLabel = (n) => (workspace === "content" ? `${n} konten belum tayang` : `${n} tugas belum selesai`);
-  // Di Beban kerja tim, pilihan klien hanya filter; menu yang aktif tetap "Beban kerja tim".
-  const clientNavState = workspace === "workload" ? "is-filter" : "is-active";
+  // Sidebar: bagian atas memilih halaman (ruang kerja), bagian Klien menyaring isi halaman itu.
+  const WORKSPACES = [
+    ["project", "Project", "columns"],
+    ["content", "Content plan", "calendar"],
+    ["workload", "Beban kerja tim", "users"],
+  ];
 
   // Pilihan orang untuk dropdown (avatar + nama).
   const personOptions = profiles.map((p) => ({
@@ -772,30 +858,24 @@ export default function AgencyTracker() {
           </button>
         </div>
 
-        <div className="segmented workspace-switch" role="tablist" aria-label="Ruang kerja">
-          <button role="tab" aria-selected={workspace === "project"} className={workspace === "project" ? "is-active" : ""} onClick={() => changeWorkspace("project")}>
-            <Icon name="columns" size={13} />
-            Project
-          </button>
-          <button role="tab" aria-selected={workspace === "content"} className={workspace === "content" ? "is-active" : ""} onClick={() => changeWorkspace("content")}>
-            <Icon name="calendar" size={13} />
-            Content plan
-          </button>
-        </div>
+        <nav className="nav-group" aria-label="Ruang kerja">
+          {WORKSPACES.map(([id, label, icon]) => (
+            <button key={id} className={`nav-item ${workspace === id ? "is-active" : ""}`} aria-current={workspace === id ? "page" : undefined} onClick={() => changeWorkspace(id)}>
+              <Icon name={icon} size={15} />
+              <span className="nav-text">{label}</span>
+            </button>
+          ))}
+        </nav>
 
-        <nav>
-          <button className={`nav-item nav-workload ${workspace === "workload" ? "is-active" : ""}`} onClick={() => changeWorkspace("workload")}>
-            <Icon name="users" size={15} />
-            <span className="nav-text">Beban kerja tim</span>
-          </button>
-          <button className={`nav-item ${activeClient === "all" ? clientNavState : ""}`} onClick={() => { setActiveClient("all"); setNavOpen(false); }} title={clientCountLabel(allOpenCount)}>
+        <nav className="nav-group" aria-label="Klien">
+          <div className="nav-label">Klien</div>
+          <button className={`nav-item ${activeClient === "all" ? "is-selected" : ""}`} aria-pressed={activeClient === "all"} onClick={() => { setActiveClient("all"); setNavOpen(false); }} title={clientCountLabel(allOpenCount)}>
             <Icon name="folder" size={15} />
             <span className="nav-text">Semua klien</span>
             {workspace !== "workload" && <NavCount n={allOpenCount} label={clientCountLabel(allOpenCount)} />}
           </button>
-          <div className="nav-label">Klien</div>
           {activeClients.map((c) => (
-            <button key={c.id} className={`nav-item ${activeClient === c.id ? clientNavState : ""}`} onClick={() => { setActiveClient(c.id); setNavOpen(false); }} title={`${c.name} · ${clientCountLabel(clientOpenCount(c.id))}`}>
+            <button key={c.id} className={`nav-item ${activeClient === c.id ? "is-selected" : ""}`} aria-pressed={activeClient === c.id} onClick={() => { setActiveClient(c.id); setNavOpen(false); }} title={`${c.name}: ${clientCountLabel(clientOpenCount(c.id))}`}>
               <span className="dot" style={{ background: c.color }} />
               <span className="nav-text">{c.short}</span>
               {workspace !== "workload" && <NavCount n={clientOpenCount(c.id)} label={clientCountLabel(clientOpenCount(c.id))} />}
@@ -828,7 +908,7 @@ export default function AgencyTracker() {
       <div className="main">
         {/* ---------- Topbar ---------- */}
         <header className="topbar">
-          <button className="btn btn-ghost btn-icon nav-toggle" onClick={() => setNavOpen(true)} aria-label="Buka menu klien">
+          <button className="btn btn-ghost btn-icon nav-toggle" onClick={() => setNavOpen(true)} aria-label="Buka menu">
             <Icon name="menu" />
           </button>
           <div className="topbar-brand" aria-hidden="true">
@@ -837,7 +917,8 @@ export default function AgencyTracker() {
           </div>
           <label className="search">
             <Icon name="search" size={14} />
-            <input className="field" value={query} onChange={(e) => setQuery(e.target.value)} placeholder={workspace === "content" ? "Cari konten…" : workspace === "workload" ? "Cari anggota…" : "Cari tugas…"} aria-label={workspace === "content" ? "Cari konten" : workspace === "workload" ? "Cari anggota" : "Cari tugas"} />
+            <input ref={searchRef} aria-keyshortcuts="/" className="field" value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === "Escape" && query) { e.preventDefault(); setQuery(""); } }} placeholder={workspace === "content" ? "Cari konten…" : workspace === "workload" ? "Cari anggota…" : "Cari tugas…"} aria-label={workspace === "content" ? "Cari konten" : workspace === "workload" ? "Cari anggota" : "Cari tugas"} />
+            <kbd className="search-kbd" aria-hidden="true">/</kbd>
           </label>
           <div className="topbar-spacer" />
           {saveLabel && (
@@ -847,7 +928,7 @@ export default function AgencyTracker() {
             </span>
           )}
           {/* Di HP tombol ini menjadi tombol bulat melayang di kanan bawah (lihat .btn-new di CSS). */}
-          <button className="btn btn-primary btn-new" onClick={workspace === "content" ? () => setContentNewTick((t) => t + 1) : openNew} aria-label={workspace === "content" ? "Konten baru" : "Tugas baru"}>
+          <button className="btn btn-primary btn-new" onClick={workspace === "content" ? () => setContentNewTick((t) => t + 1) : openNew} aria-label={workspace === "content" ? "Konten baru" : "Tugas baru"} aria-keyshortcuts="N" title={`${workspace === "content" ? "Konten baru" : "Tugas baru"} (N)`}>
             <Icon name="plus" size={14} />
             <span className="btn-new-label">{workspace === "content" ? "Konten baru" : "Tugas baru"}</span>
           </button>
@@ -935,10 +1016,12 @@ export default function AgencyTracker() {
             newTick={contentNewTick}
             openPostRequest={openPostReq}
             platformDialogTick={platformTick}
+            onShow={() => changeWorkspace("content")}
           />
         {workspace === "workload" && (
           <WorkloadView
             profiles={profiles}
+            clientName={viewClient ? viewClient.name : "Semua klien"}
             tasks={boardTasks.filter((t) => activeClient === "all" || t.client === activeClient)}
             posts={contentData.posts.filter((p) => !archivedClientIds.has(p.client) && (activeClient === "all" || p.client === activeClient))}
             todayStr={todayStr}
@@ -962,11 +1045,8 @@ export default function AgencyTracker() {
             </h1>
             <div className="page-meta">
               <span className="meta-ws"><Icon name="columns" size={12} />Project</span>
-              <span className="sep">·</span>
-              <span className="mono">{visibleTasks.length}</span> tugas
-              <span className="sep">·</span>
-              <span className="mono">{doneCount}</span> selesai
-              <span className="sep">·</span>
+              <span className="meta-item"><span className="mono">{visibleTasks.length}</span> tugas</span>
+              <span className="meta-item"><span className="mono">{doneCount}</span> selesai</span>
               <span className="attention">
                 {attentionCount === 0 ? (
                   <span className="attention-btn is-ok"><Icon name="check" size={12} /> Semua on track</span>
@@ -974,7 +1054,7 @@ export default function AgencyTracker() {
                   <button className={`attention-btn ${overdueTasks.length ? "is-danger" : "is-warn"}`} onClick={() => setAttentionOpen((o) => !o)}>
                     <span className="pulse" />
                     {overdueTasks.length > 0 ? `${overdueTasks.length} lewat tenggat` : `${dueSoon.length} jatuh tempo`}
-                    {overdueTasks.length > 0 && dueSoon.length > 0 && ` · ${dueSoon.length} segera`}
+                    {overdueTasks.length > 0 && dueSoon.length > 0 && `, ${dueSoon.length} segera`}
                     <Icon name="chevronDown" size={12} />
                   </button>
                 )}
@@ -1100,7 +1180,7 @@ export default function AgencyTracker() {
                     <StatusDot column={col.id} />
                   )}
                   <span className="column-title">
-                    {col.label} {col.sub && <span className="column-sub">· {col.sub}</span>}
+                    {col.label} {col.sub && <span className="column-sub">{col.sub}</span>}
                   </span>
                   <span className="column-count">{colTasks.length}</span>
                 </header>
@@ -1344,7 +1424,7 @@ export default function AgencyTracker() {
                           <span className="dot" style={{ background: c.color, width: 10, height: 10 }} />
                           <div className="info">
                             <div className="name">{c.name}</div>
-                            <div className="sub">{c.short} · <span className="mono">{taskCount}</span> tugas</div>
+                            <div className="sub meta-row"><span>{c.short}</span><span><span className="mono">{taskCount}</span> tugas</span></div>
                           </div>
                           <button className="btn btn-ghost btn-sm" onClick={() => setArchived(c, !c.archived)}>
                             <Icon name={c.archived ? "restore" : "archive"} size={13} />
@@ -1378,11 +1458,11 @@ export default function AgencyTracker() {
       {modalOpen && editing && (
         <>
           <div className="scrim" onClick={requestCloseDrawer} />
-          <aside className="drawer" role="dialog" aria-modal="true" aria-label={editing.isNew ? "Tugas baru" : "Detail tugas"}>
+          <aside ref={drawerRef} tabIndex={-1} className="drawer" role="dialog" aria-modal="true" aria-label={editing.isNew ? "Tugas baru" : "Detail tugas"}>
             <div className="drawer-head">
               <div className="crumbs">
-                <span className="dot" style={{ background: clientOf(editing.client).color }} />
-                <strong>{clientOf(editing.client).name || "Klien"}</strong>
+                <span className="dot" style={{ background: editing.client ? clientOf(editing.client).color : "var(--line-strong)" }} />
+                <strong>{editing.client ? clientOf(editing.client).name : "Pilih klien"}</strong>
                 <Icon name="chevronRight" size={13} />
                 <span>{editing.isNew ? "Tugas baru" : COLUMN_BY_ID[editing.column]?.label}</span>
               </div>
@@ -1411,7 +1491,6 @@ export default function AgencyTracker() {
                 onKeyDown={(e) => { if (e.key === "Enter") e.preventDefault(); }}
                 disabled={!modalCanEdit}
                 placeholder="Judul tugas"
-                autoFocus={editing.isNew}
               />
 
               <div className="props">
@@ -1431,10 +1510,11 @@ export default function AgencyTracker() {
 
                 <div className="prop-label"><Icon name="folder" size={14} />Klien</div>
                 <div className="prop-value">
-                  <span className="dot" style={{ background: clientOf(editing.client).color }} />
+                  <span className="dot" style={{ background: editing.client ? clientOf(editing.client).color : "var(--line-strong)" }} />
                   <Select
                     variant="prop"
                     triggerLeading={false}
+                    placeholder="Pilih klien"
                     value={editing.client}
                     onChange={(client) => setEditing({ ...editing, client })}
                     disabled={!modalCanEdit}
@@ -1483,7 +1563,7 @@ export default function AgencyTracker() {
                   {editing.column === "ongoing" ? (
                     <span className="text-muted" style={{ fontSize: 12.5 }}>—</span>
                   ) : (
-                    <input type="date" className="field mono" value={editing.start || ""} max={editing.due || undefined} onChange={(e) => setEditing({ ...editing, start: e.target.value })} disabled={!modalCanEdit} />
+                    <input type="date" className="field mono" value={editing.start || ""} max={editing.due || undefined} onChange={(e) => setEditing({ ...editing, start: e.target.value })} disabled={!modalCanEdit} aria-label="Tanggal mulai" />
                   )}
                 </div>
 
@@ -1532,15 +1612,15 @@ export default function AgencyTracker() {
                         return (
                           <div key={s.id} className={`subtask ${s.done ? "is-done" : ""}`}>
                             <div className="subtask-row">
-                              <input type="checkbox" className="check check-round is-done" checked={s.done} onChange={() => toggleSubtask(s.id)} disabled={!workable} />
+                              <input type="checkbox" className="check check-round is-done" checked={s.done} onChange={() => toggleSubtask(s.id)} disabled={!workable} aria-label={`Selesai: ${s.text}`} />
                               <span className="subtask-text" onClick={() => setExpandedSubtask(isOpen ? null : s.id)}>{s.text}</span>
                               {hasExtra && <span className="meta-icon"><Icon name="clip" size={12} /></span>}
                               <Avatar profile={profileOf(s.assignee)} size={20} />
-                              <button className="btn btn-ghost btn-icon btn-sm" onClick={() => setExpandedSubtask(isOpen ? null : s.id)} aria-label="Detail subtask">
+                              <button className="btn btn-ghost btn-icon btn-sm" onClick={() => setExpandedSubtask(isOpen ? null : s.id)} aria-label={`Detail subtask ${s.text}`} aria-expanded={isOpen}>
                                 <Icon name="chevronDown" size={14} style={{ transform: isOpen ? "rotate(180deg)" : "none", transition: "transform .2s" }} />
                               </button>
                               {modalCanEdit && (
-                                <button className="btn btn-ghost btn-icon btn-sm" onClick={() => removeSubtask(s.id)} aria-label="Hapus subtask" style={{ color: "var(--faint)" }}>
+                                <button className="btn btn-ghost btn-icon btn-sm" onClick={() => removeSubtask(s.id)} aria-label={`Hapus subtask ${s.text}`} style={{ color: "var(--muted)" }}>
                                   <Icon name="x" size={14} />
                                 </button>
                               )}
@@ -1637,11 +1717,12 @@ export default function AgencyTracker() {
                 </button>
               )}
               <span className="grow" />
+              {drawerMissing && <span className="drawer-hint">{drawerMissing}</span>}
               <button className="btn btn-secondary" onClick={() => setModalOpen(false)}>
                 {modalCanEdit || modalHasOwnSubtasks ? "Batal" : "Tutup"}
               </button>
               {(modalCanEdit || modalHasOwnSubtasks) && (
-                <button className="btn btn-primary" onClick={saveTask} disabled={!editing.title.trim() || datesInvalid}>
+                <button className="btn btn-primary" onClick={saveTask} disabled={!editing.title.trim() || !editing.client || datesInvalid}>
                   Simpan
                 </button>
               )}

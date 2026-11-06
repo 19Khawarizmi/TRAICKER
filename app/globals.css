@@ -426,7 +426,7 @@ textarea.field {
 }
 
 .sel-trigger.is-placeholder .sel-value {
-  color: var(--faint);
+  color: var(--muted);
 }
 
 .sel-chevron {
@@ -865,14 +865,32 @@ textarea.field {
   color: var(--ink);
 }
 
-/* Filter klien yang sedang dipakai di halaman lintas ruang kerja (Beban kerja tim). */
-.nav-item.is-filter {
-  color: var(--ink);
-  font-weight: 600;
+/* Sidebar dua bagian: ruang kerja (halaman) di atas, klien (penyaring) di bawahnya. */
+.nav-group {
+  display: grid;
+  gap: 1px;
 }
 
-.nav-item.is-filter .dot {
-  box-shadow: 0 0 0 2px var(--surface), 0 0 0 3.5px currentColor;
+.nav-group + .nav-group {
+  margin-top: 6px;
+}
+
+/* Klien yang sedang dipilih: penyaring, bukan halaman, jadi tampil lebih ringan dari ruang kerja aktif. */
+.nav-item.is-selected {
+  color: var(--ink);
+  font-weight: 650;
+}
+
+.nav-item.is-selected .dot {
+  box-shadow: 0 0 0 2px var(--surface-2), 0 0 0 3.5px currentColor;
+}
+
+.nav-item.is-selected:hover .dot {
+  box-shadow: 0 0 0 2px var(--hover), 0 0 0 3.5px currentColor;
+}
+
+.nav-item.is-selected .nav-count {
+  color: var(--muted);
 }
 
 .nav-item.is-active {
@@ -973,9 +991,38 @@ textarea.field {
   pointer-events: none;
 }
 
+/* Petunjuk shortcut "/" di kolom cari; hilang saat kolom dipakai dan di layar sentuh. */
+.search-kbd {
+  position: absolute;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  font-family: var(--font-sans-stack);
+  font-size: 11px;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+.search .field:focus ~ .search-kbd,
+.search .field:not(:placeholder-shown) ~ .search-kbd {
+  display: none;
+}
+
+@media (hover: none) {
+  .search-kbd {
+    display: none;
+  }
+}
+
 .search .field {
   height: 32px;
   padding-left: 32px;
+  padding-right: 30px;
   border-radius: var(--r-sm);
   border-color: var(--line);
   background: var(--surface);
@@ -1048,18 +1095,26 @@ textarea.field {
   letter-spacing: -0.03em;
 }
 
+/* Baris keterangan halaman: tiap bagian dipisah jarak, tanpa tanda pemisah. */
 .page-meta {
   display: flex;
   align-items: center;
-  gap: 5px; /* jarak angka–kata seperti spasi biasa */
+  gap: 6px 16px;
   flex-wrap: wrap;
   margin-top: 10px;
   font-size: 13px;
   color: var(--muted);
 }
 
-.page-meta .sep {
-  color: var(--faint);
+.meta-item {
+  white-space: nowrap;
+}
+
+/* Keterangan kecil berisi beberapa bagian (mis. "IMMFC   6 tugas"). */
+.meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
 }
 
 .toolbar {
@@ -1112,18 +1167,8 @@ textarea.field {
   height: 6px;
   border-radius: 50%;
   background: currentColor;
-  box-shadow: 0 0 0 0 currentColor;
-  animation: pulse 2.2s ease-out infinite;
-}
-
-@keyframes pulse {
-  0% {
-    box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 45%, transparent);
-  }
-  70%,
-  100% {
-    box-shadow: 0 0 0 6px transparent;
-  }
+  /* Titik diam: tetap menandai, tanpa animasi terus-menerus yang mengganggu seharian. */
+  box-shadow: 0 0 0 2.5px color-mix(in srgb, currentColor 22%, transparent);
 }
 
 .popover {
@@ -1735,8 +1780,20 @@ textarea.field {
   flex-shrink: 0;
 }
 
+/* Panel & dialog menerima fokus saat dibuka (untuk keyboard/pembaca layar); tanpa garis fokus di bingkainya. */
+.drawer:focus,
+.dialog.confirm:focus {
+  outline: none;
+}
+
 .drawer-foot .grow {
   flex: 1;
+}
+
+/* Alasan tombol Simpan belum aktif. */
+.drawer-hint {
+  font-size: 12.5px;
+  color: var(--muted);
 }
 
 .notice {
@@ -2212,9 +2269,6 @@ textarea.field {
 }
 
 /* ---------- Beban kerja tim ---------- */
-.nav-workload {
-  margin-bottom: 6px;
-}
 
 .wl-wrap {
   padding: 2px 24px 40px;
@@ -2223,6 +2277,7 @@ textarea.field {
 .wl-note {
   margin: 0 0 16px;
   max-width: 80ch;
+  text-wrap: pretty;
   font-size: 12.5px;
   color: var(--muted);
 }
@@ -2373,6 +2428,7 @@ textarea.field {
 }
 
 .wl-late {
+  margin-left: 6px;
   font-weight: 500;
 }
 
@@ -3303,23 +3359,34 @@ textarea.field {
   text-overflow: ellipsis;
 }
 
+/* Judul untuk batang pendek, ditulis di kanan batang. */
+.timeline-bar-outside {
+  position: absolute;
+  top: 7px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  max-width: 220px;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--ink-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+
+.timeline-bar-outside.is-done {
+  opacity: 0.55;
+}
+
 
 
 /* ==========================================================================
    Ruang kerja Content plan
    ========================================================================== */
 
-/* Pemilih ruang kerja di sidebar */
-.workspace-switch {
-  margin: 0 2px 14px;
-}
-
-.workspace-switch button {
-  height: 32px;
-  font-size: 12.5px;
-}
-
-/* Nama ruang kerja di awal baris keterangan halaman ("Project · 6 tugas · …"). */
+/* Nama ruang kerja di awal baris keterangan halaman ("Project   6 tugas   1 selesai"). */
 .meta-ws {
   display: inline-flex;
   align-items: center;
@@ -3530,6 +3597,49 @@ textarea.field {
 
 .cp-table td.is-late {
   color: var(--danger);
+}
+
+/* Pemisah kelompok "Belum tayang" / "Sudah tayang" di tabel content plan. */
+.cp-table tbody tr.cp-group-row {
+  cursor: default;
+}
+
+.cp-table tbody tr.cp-group-row:hover {
+  background: none;
+}
+
+.cp-group-row td {
+  padding: 14px 12px 6px;
+  border-bottom: 1px solid var(--line);
+}
+
+.cp-group-label {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.cp-group-label .mono {
+  margin-left: 4px;
+  color: var(--ink-2);
+}
+
+.cp-group-note {
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.cp-group-row td .btn {
+  margin: -4px 0 2px -8px;
+}
+
+/* Tombol "Lihat semua yang tayang" di bawah kolom Tayang. */
+.col-more {
+  justify-content: center;
+  width: 100%;
+  color: var(--muted);
 }
 
 .cp-title-cell {
@@ -3978,7 +4088,7 @@ textarea.field {
 }
 
 .rp-todo-list li.is-done {
-  color: var(--muted);
+  color: var(--ink-2);
 }
 
 .rp-todo-mark {
@@ -4183,6 +4293,17 @@ textarea.field {
   white-space: nowrap;
   font-size: 13px;
   font-weight: 500;
+}
+
+.rp-rank-format {
+  margin-left: 8px;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.agenda-time {
+  margin-right: 8px;
+  color: var(--muted);
 }
 
 .rp-rank-num {
@@ -4496,6 +4617,11 @@ textarea.field {
 
   .btn-new-label {
     display: none;
+  }
+
+  /* Ruang kosong di bawah halaman supaya isi terakhir bisa digulir ke atas tombol bulat. */
+  .main {
+    padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px));
   }
 
   /* Judul halaman & toolbar. */
@@ -4855,6 +4981,8 @@ textarea.field {
 @media (hover: none) {
   .card-move {
     display: inline-flex;
+    width: 40px;
+    height: 34px;
   }
 
   /* Kontrol yang di desktop baru muncul saat kursor diarahkan. */
@@ -4942,11 +5070,6 @@ textarea.field {
 
   .cp-cell-head {
     justify-content: center;
-  }
-
-  .workspace-switch button {
-    height: 38px;
-    font-size: 13.5px;
   }
 }
 

@@ -64,6 +64,10 @@ function TrendChart({ title, series, axisLabels, longLabels, format, kind }) {
         {axisLabels.map((label, i) => (
           <text key={i} x={x0(i)} y={H - 8} className="rp-axis" textAnchor="middle">{label}</text>
         ))}
+        {/* Periode tanpa angka sama sekali ditandai, supaya garis yang putus tidak terbaca sebagai nol. */}
+        {axisLabels.map((_, i) => series.every((s) => s.values[i] == null) && (
+          <text key={`empty-${i}`} x={x0(i)} y={H - B - 6} className="rp-axis" textAnchor="middle">kosong</text>
+        ))}
         {kind === "bar" &&
           series.map((s, si) =>
             s.values.map((v, i) => {
@@ -72,7 +76,7 @@ function TrendChart({ title, series, axisLabels, longLabels, format, kind }) {
               const h = Math.max(1, H - B - y(v));
               return (
                 <rect key={`${s.id}-${i}`} x={x} y={H - B - h} width={barW} height={h} rx={3} fill={s.color} className="rp-col">
-                  <title>{`${s.name} · ${longLabels[i]}: ${format(v)}`}</title>
+                  <title>{`${s.name}, ${longLabels[i]}: ${format(v)}`}</title>
                 </rect>
               );
             })
@@ -86,7 +90,7 @@ function TrendChart({ title, series, axisLabels, longLabels, format, kind }) {
                 <path d={d} fill="none" stroke={s.color} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
                 {pts.map((p, i) => p && (
                   <circle key={i} cx={p[0]} cy={p[1]} r="4" fill={s.color} className="rp-dot">
-                    <title>{`${s.name} · ${longLabels[i]}: ${format(s.values[i])}`}</title>
+                    <title>{`${s.name}, ${longLabels[i]}: ${format(s.values[i])}`}</title>
                   </circle>
                 ))}
               </g>
@@ -128,8 +132,8 @@ const axisNum = (v, axis) => (axis ? (v >= 1000 ? `${Math.round(v / 1000)}rb` : 
 export default function ReportView({
   posts, platforms, clients, activeClients, activeClient, followers, targets, quotas, insights,
   isAdmin, currentUserId, clientOf, profileOf, todayStr, onOpen, save, setFollowers, setTargets, setQuotas, setInsights,
+  clientId, onPickClient,
 }) {
-  const [pickedClient, setPickedClient] = useState(null);
   const [kind, setKind] = useState(() => {
     try {
       return localStorage.getItem("traicker:report-kind") === "monthly" ? "monthly" : "weekly";
@@ -151,9 +155,7 @@ export default function ReportView({
     } catch {}
   }
 
-  // Report selalu per klien. Saat sidebar "Semua klien", pilih klien di sini.
-  const clientsWithPosts = activeClients.filter((c) => posts.some((p) => p.client === c.id));
-  const clientId = activeClient !== "all" ? activeClient : pickedClient || clientsWithPosts[0]?.id || activeClients[0]?.id;
+  // Report selalu per klien (dipilih di ContentPlan, supaya judul halaman ikut menyebut kliennya).
   const client = clientOf(clientId);
   const clientPosts = useMemo(() => posts.filter((p) => p.client === clientId), [posts, clientId]);
   const usedPlatformIds = platforms.filter((pf) => clientPosts.some((p) => p.platform === pf.id) || !pf.archived).map((p) => p.id);
@@ -274,7 +276,7 @@ export default function ReportView({
             <Select
               variant="toolbar"
               value={clientId}
-              onChange={setPickedClient}
+              onChange={onPickClient}
               ariaLabel="Klien untuk report"
               searchPlaceholder="Cari klien…"
               options={activeClients.map((c) => ({ value: c.id, label: c.name, leading: <span className="sel-swatch" style={{ "--swatch": c.color }} /> }))}
@@ -407,7 +409,7 @@ export default function ReportView({
                     <span className="mono" style={{ marginLeft: "auto" }}>{q.done} / {q.quota}</span>
                   </div>
                   <div className="progress-track" style={{ height: 6 }}><div className="progress-fill" style={{ width: `${pct * 100}%`, background: pf?.color }} /></div>
-                  <div className="text-muted">Sisa {q.remain} konten · periode {fmtShortDate(q.start)} – {new Date(q.end + "T00:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}</div>
+                  <div className="text-muted">Sisa {q.remain} konten, periode {fmtShortDate(q.start)} – {new Date(q.end + "T00:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}</div>
                 </div>
               );
             })
@@ -484,7 +486,7 @@ function WeeklyPlatform({ pf, rows, keys, record, periodEnd, period, onFollowers
       <header className="rp-platform-head">
         <span className="pf-badge" style={{ "--pf": pf.color }}>{pf.short}</span>
         <h2>{pf.name}</h2>
-        <span className="text-muted">{cur.posts} konten tayang · {cur.measured} dengan angka</span>
+        <span className="text-muted">{cur.posts} konten tayang, {cur.measured} sudah ada angkanya</span>
       </header>
 
       <div className="rp-tiles">
@@ -716,7 +718,7 @@ function WeeklyChecklist({ missing, total, followersMissing, onOpen }) {
         </li>
         <li>
           <span className="rp-todo-mark" aria-hidden="true">3</span>
-          <span>Klik <b>Export mingguan</b> di kanan atas untuk mengunduh Excel.</span>
+          <span>Klik tombol <b>Export mingguan</b> di atas untuk mengunduh Excel.</span>
         </li>
       </ol>
     </section>
@@ -762,9 +764,9 @@ function RankRow({ post: p, platform, onOpen }) {
   return (
     <button className="rp-rank" onClick={() => onOpen(p)}>
       <span className="pf-badge is-mini" style={{ "--pf": platform?.color }}>{platform?.short}</span>
-      <span className="rp-rank-title">{p.title}<span className="text-muted"> · {p.format || "—"}</span></span>
+      <span className="rp-rank-title">{p.title}{p.format && <span className="rp-rank-format">{p.format}</span>}</span>
       <span className="mono rp-rank-num">{fmtPct(erOf(p), 1)}</span>
-      <span className="mono text-muted rp-rank-sub">{fmtInt(p.metrics.reach)} reach · {fmtInt(engagementOf(p))} eng.</span>
+      <span className="mono text-muted rp-rank-sub">{fmtInt(p.metrics.reach)} reach, {fmtInt(engagementOf(p))} engagement</span>
     </button>
   );
 }

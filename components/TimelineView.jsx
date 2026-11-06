@@ -115,17 +115,27 @@ export default function TimelineView({ tasks, todayStr, clientOf, isOverdue, onO
                       const late = isOverdue(t.due, t.column, todayStr);
                       const subs = t.subtasks || [];
                       const pct = subs.length ? Math.round((subs.filter((x) => x.done).length / subs.length) * 100) : t.column === "done" ? 100 : 0;
+                      const left = s * DAY_W + 3;
+                      const barW = Math.max(1, e - s + 1) * DAY_W - 6;
+                      // Batang pendek (1–2 hari) tidak muat judul: judul ditulis di sebelah kanan batang.
+                      const short = barW < 90;
                       return (
                         <div key={t.id} className="timeline-row">
                           <button
                             className={`timeline-bar ${t.column === "done" ? "is-done" : ""} ${late ? "is-late" : ""}`}
-                            style={{ left: s * DAY_W + 3, width: Math.max(1, e - s + 1) * DAY_W - 6, "--bar": c.color }}
+                            style={{ left, width: barW, "--bar": c.color }}
                             onClick={() => onOpen(t)}
-                            title={`${t.title}\n${t.start ? `${t.start} → ` : ""}${t.due} · ${columns[t.column] || t.column}`}
+                            title={`${t.title}\n${t.start ? `${t.start} → ` : ""}${t.due}\n${columns[t.column] || t.column}`}
+                            aria-label={t.title}
                           >
                             <span className="timeline-bar-fill" style={{ width: `${pct}%` }} />
-                            <span className="timeline-bar-text">{t.title}</span>
+                            {!short && <span className="timeline-bar-text">{t.title}</span>}
                           </button>
+                          {short && (
+                            <span className={`timeline-bar-outside ${t.column === "done" ? "is-done" : ""}`} style={{ left: left + barW + 6 }} aria-hidden="true">
+                              {t.title}
+                            </span>
+                          )}
                         </div>
                       );
                     })}

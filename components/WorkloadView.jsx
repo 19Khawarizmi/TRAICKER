@@ -43,7 +43,7 @@ function collectItems(tasks, posts) {
 // Urut dari deadline terdekat; yang tanpa tanggal di akhir.
 const byDate = (a, b) => (a.date || "9999").localeCompare(b.date || "9999");
 
-export default function WorkloadView({ profiles, tasks, posts, todayStr, query, currentUserId, clientOf, jobTitleOf, Avatar, onOpenTask, onOpenPost }) {
+export default function WorkloadView({ profiles, clientName, tasks, posts, todayStr, query, currentUserId, clientOf, jobTitleOf, Avatar, onOpenTask, onOpenPost }) {
   const [sortBy, setSortBy] = useState("busy");
   const [jobFilter, setJobFilter] = useState("all");
   const [expanded, setExpanded] = useState(() => new Set());
@@ -74,9 +74,9 @@ export default function WorkloadView({ profiles, tasks, posts, todayStr, query, 
           <h1 className="page-title">Siapa sedang mengerjakan apa</h1>
           <div className="page-meta">
             <span className="meta-ws"><Icon name="users" size={12} />Beban kerja tim</span>
-            <span className="sep">·</span>
-            <span className="mono">{items.length}</span> pekerjaan belum selesai
-            {unassigned.length > 0 && (<><span className="sep">·</span><span className="apv is-warn">{unassigned.length} belum ditugaskan</span></>)}
+            <span className="meta-item">{clientName}</span>
+            <span className="meta-item"><span className="mono">{items.length}</span> pekerjaan belum selesai</span>
+            {unassigned.length > 0 && <span className="apv is-warn">{unassigned.length} belum ditugaskan</span>}
           </div>
         </div>
         <div className="toolbar">
@@ -112,18 +112,7 @@ export default function WorkloadView({ profiles, tasks, posts, todayStr, query, 
         </p>
 
         <div className="wl-grid">
-          {visible.map((c) => (
-            <PersonCard
-              key={c.id}
-              items={c.items}
-              title={c.profile.name + (c.id === currentUserId ? " (saya)" : "")}
-              sub={jobTitleOf(c.profile.jobTitleId) || ROLE_LABEL[c.profile.role]}
-              avatar={<Avatar profile={c.profile} size={30} />}
-              expanded={expanded.has(c.id)}
-              onToggle={() => toggle(c.id)}
-              {...cardProps}
-            />
-          ))}
+          {/* Pekerjaan yang belum ada orangnya paling atas: ini yang perlu dibagi. */}
           {unassigned.length > 0 && jobFilter === "all" && !q && (
             <PersonCard
               items={unassigned}
@@ -136,6 +125,18 @@ export default function WorkloadView({ profiles, tasks, posts, todayStr, query, 
               {...cardProps}
             />
           )}
+          {visible.map((c) => (
+            <PersonCard
+              key={c.id}
+              items={c.items}
+              title={c.profile.name + (c.id === currentUserId ? " (saya)" : "")}
+              sub={jobTitleOf(c.profile.jobTitleId) || ROLE_LABEL[c.profile.role]}
+              avatar={<Avatar profile={c.profile} size={30} />}
+              expanded={expanded.has(c.id)}
+              onToggle={() => toggle(c.id)}
+              {...cardProps}
+            />
+          ))}
         </div>
         {visible.length === 0 && <p className="wl-empty">Tidak ada anggota yang cocok dengan filter.</p>}
       </div>
@@ -165,17 +166,17 @@ function PersonCard({ items, title, sub, avatar, expanded, onToggle, todayStr, c
             const client = clientOf(it.client);
             return (
               <li key={it.key}>
-                <button className="wl-item" onClick={() => onOpenItem(it)} title={`${it.title} · ${client.name} · ${it.status}`}>
+                <button className="wl-item" onClick={() => onOpenItem(it)} title={`${it.title}\n${client.name}, ${it.status}`}>
                   <span className="dot" style={{ background: client.color }} aria-hidden="true" />
                   <span className="wl-item-text">
                     <span className="wl-item-title">{it.title}</span>
                     <span className="wl-item-sub">
-                      {it.kind === "subtask" ? `Subtask di ${it.parent}` : `${it.kind === "content" ? "Konten" : "Tugas"} · ${it.status}`}
+                      {it.kind === "subtask" ? `Subtask di ${it.parent}` : `${it.kind === "content" ? "Konten" : "Tugas"}, ${it.status}`}
                     </span>
                   </span>
                   <span className={`wl-item-date ${late ? "is-late" : ""}`}>
                     {it.date ? fmtDay(it.date) : "—"}
-                    {late && <span className="wl-late"> · lewat</span>}
+                    {late && <span className="wl-late">lewat</span>}
                   </span>
                 </button>
               </li>

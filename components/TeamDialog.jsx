@@ -264,7 +264,7 @@ export default function TeamDialog({ profiles, jobTitles, onJobTitlesChange, per
                     <Icon name="check" size={12} /> {credentials.kind === "created" ? "Akun dibuat" : "Password diganti"}
                   </span>
                   <span className="text-muted">
-                    {credentials.user.name} · {ROLE_LABEL[credentials.user.role] || "Member"}
+                    {credentials.user.name} ({ROLE_LABEL[credentials.user.role] || "Member"})
                   </span>
                 </div>
                 <div className="mono" style={{ fontSize: 12.5, lineHeight: 1.7, padding: "10px 12px", border: "1px solid var(--line)", borderRadius: "var(--r-sm)", background: "var(--surface)", userSelect: "all", wordBreak: "break-all" }}>
@@ -341,7 +341,7 @@ export default function TeamDialog({ profiles, jobTitles, onJobTitlesChange, per
                         {p.name}
                         {isSelf && <span className="text-muted"> (kamu)</span>}
                       </div>
-                      <div className="sub">{[jobTitleOf(p.jobTitleId), p.email].filter(Boolean).join(" · ")}</div>
+                      <div className="sub">{[jobTitleOf(p.jobTitleId), p.email].filter(Boolean).join(", ")}</div>
                     </div>
                     <span className={`role-badge is-${p.role}`} style={{ marginTop: 0 }}>
                       {ROLE_LABEL[p.role] || "Member"}
