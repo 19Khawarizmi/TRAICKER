@@ -48,7 +48,6 @@ export default function NotificationBell({ userId, profileOf, Avatar, onOpenTask
       clearTimeout(reloadTimer.current);
       supabase.removeChannel(channel);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
 
   // Esc menutup panel notifikasi.

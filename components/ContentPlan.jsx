@@ -171,7 +171,6 @@ export default function ContentPlan({
       clearTimeout(timer);
       supabase.removeChannel(channel);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function changeView(next) {
@@ -307,7 +306,7 @@ export default function ContentPlan({
     function onKey(e) {
       if (e.key !== "Escape" || e.defaultPrevented || !active) return;
       if (platformDialog) setPlatformDialog(false);
-      else if (editing) requestClosePost();
+      else if (editing) requestClosePostRef.current();
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -426,6 +425,8 @@ export default function ContentPlan({
 
   const savePostRef = useRef(null);
   savePostRef.current = savePost;
+  const requestClosePostRef = useRef(null);
+  requestClosePostRef.current = requestClosePost;
 
   function patchPost(p, fields) {
     if (!canEditPost(p)) return;

@@ -154,12 +154,14 @@ export function ToastHost() {
 }
 
 export function ConfirmHost() {
-  const [dialog, setDialog] = useState(null);
+  // Antrean: kalau dua konfirmasi diminta bersamaan, yang kedua tampil setelah yang pertama dijawab.
+  const [queue, setQueue] = useState([]);
+  const dialog = queue[0] || null;
   const dialogRef = useRef(null);
-  useDialogFocus(dialogRef, !!dialog, "[data-autofocus]");
+  useDialogFocus(dialogRef, dialog?.key || null, "[data-autofocus]");
 
   useEffect(() => {
-    confirmListener = (d) => setDialog(d);
+    confirmListener = (d) => setQueue((prev) => [...prev, { ...d, key: crypto.randomUUID() }]);
     return () => {
       confirmListener = null;
     };
@@ -167,7 +169,7 @@ export function ConfirmHost() {
 
   function close(id) {
     dialog?.resolve(id);
-    setDialog(null);
+    setQueue((prev) => prev.slice(1));
   }
 
   useEffect(() => {

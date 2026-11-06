@@ -144,12 +144,9 @@ export default function TaskFeed({ taskId, field = "task_id", currentUserId, isA
   const all = items || [];
   const activityCount = all.filter((i) => i.kind === "activity").length;
   const hiddenActivity = showAllActivity ? 0 : Math.max(0, activityCount - 6);
-  let skipped = 0;
-  const visible = all.filter((i) => {
-    if (i.kind !== "activity" || skipped >= hiddenActivity) return true;
-    skipped += 1;
-    return false;
-  });
+  // Aktivitas paling lama disembunyikan dulu (komentar selalu tampil).
+  const hidden = new Set(all.filter((i) => i.kind === "activity").slice(0, hiddenActivity));
+  const visible = all.filter((i) => !hidden.has(i));
 
   return (
     <section className="feed">

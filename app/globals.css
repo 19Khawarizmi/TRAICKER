@@ -743,7 +743,11 @@ textarea.field {
   justify-content: center;
   flex-shrink: 0;
   box-shadow: 0 0 0 2px var(--surface);
-  letter-spacing: 0.01em;
+  /* Inisial di tengah lingkaran secara optis: tinggi teks dihitung dari tinggi huruf kapital saja,
+     bukan termasuk ruang ekor huruf (g, y) yang membuat inisial tampak naik. */
+  line-height: 1;
+  letter-spacing: 0;
+  text-box: trim-both cap alphabetic;
   user-select: none;
 }
 

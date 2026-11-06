@@ -158,6 +158,7 @@ export default function Select({
     }
     // Ketik huruf untuk melompat (kalau tidak ada kolom cari).
     if (!canSearch && e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      // eslint-disable-next-line react-hooks/purity -- dipanggil saat tombol ditekan, bukan saat render
       const now = Date.now();
       const t = typeahead.current;
       t.text = now - t.at > 700 ? e.key.toLowerCase() : t.text + e.key.toLowerCase();
@@ -171,7 +172,6 @@ export default function Select({
   const showLeading = triggerLeading && selected?.leading;
   const listId = `${id}-list`;
 
-  let lastGroup;
   const menu = open && pos && (
     <>
       <div className="sel-scrim" onMouseDown={(e) => { e.preventDefault(); close(); }} />
@@ -206,8 +206,8 @@ export default function Select({
         >
           {filtered.length === 0 && <li className="sel-empty">Tidak ada yang cocok</li>}
           {filtered.map((o, i) => {
-            const head = o.group && o.group !== lastGroup ? <li className="sel-group" role="presentation">{o.group}</li> : null;
-            lastGroup = o.group;
+            // Judul grup tampil di pilihan pertama setiap grup.
+            const head = o.group && o.group !== filtered[i - 1]?.group ? <li className="sel-group" role="presentation">{o.group}</li> : null;
             const isSelected = o.value === value;
             return (
               <React.Fragment key={String(o.value)}>

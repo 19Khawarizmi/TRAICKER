@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import Icon from "@/components/icons";
+import { clearAllDrafts } from "@/lib/drafts";
 
 // Auto logout kalau tidak ada aktivitas. Ubah angka di sini untuk mengganti batas waktunya.
 export const IDLE_TIMEOUT_MS = 30 * 60 * 1000; // 30 menit
@@ -39,7 +40,7 @@ function formatMinutes(ms) {
 }
 
 export default function IdleLogout() {
-  const lastRef = useRef(Date.now());
+  const lastRef = useRef(0); // diisi saat komponen dipasang (lihat efek di bawah)
   const lastWriteRef = useRef(0);
   const loggingOutRef = useRef(false);
   const [secondsLeft, setSecondsLeft] = useState(null); // null = peringatan tidak tampil
@@ -47,8 +48,8 @@ export default function IdleLogout() {
   useEffect(() => {
     // Sesi lama dari kunjungan sebelumnya (mis. laptop ditutup semalaman) langsung diperiksa.
     const stored = readLastActivity();
-    if (stored) lastRef.current = stored;
-    else markActivity();
+    lastRef.current = stored || Date.now();
+    if (!stored) markActivity();
 
     async function logout() {
       if (loggingOutRef.current) return;
@@ -123,7 +124,7 @@ export default function IdleLogout() {
             </div>
           </div>
           <div className="dialog-body" style={{ display: "flex", gap: 8, justifyContent: "flex-end", paddingTop: 10 }}>
-            <button className="btn btn-secondary" onClick={() => { setSecondsLeft(null); supabase.auth.signOut({ scope: "local" }); }}>
+            <button className="btn btn-secondary" onClick={() => { setSecondsLeft(null); clearAllDrafts(); supabase.auth.signOut({ scope: "local" }); }}>
               <Icon name="logout" size={14} />
               Keluar sekarang
             </button>

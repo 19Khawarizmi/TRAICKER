@@ -18,7 +18,7 @@ import WorkloadView from "@/components/WorkloadView";
 import Select from "@/components/Select";
 import BrandMark from "@/components/BrandMark";
 import { useDialogFocus } from "@/lib/useDialogFocus";
-import { stashDraft, readDraft, clearDraft } from "@/lib/drafts";
+import { stashDraft, readDraft, clearDraft, clearAllDrafts } from "@/lib/drafts";
 import { ToastHost, ConfirmHost, showToast, askConfirm, confirmDelete } from "@/components/Feedback";
 import { ROLE_LABEL, canManageWork } from "@/lib/roles";
 
@@ -81,9 +81,13 @@ function avatarColor(id) {
   return AVATAR_COLORS[h % AVATAR_COLORS.length];
 }
 
+// Inisial diambil dari huruf: angka di depan nama dilewati ("19khawarizmi" → "K").
+// Angka hanya dipakai kalau namanya tidak punya huruf sama sekali.
 function initials(name) {
   const parts = name.replace(/[^\p{L}\p{N}\s._-]/gu, "").split(/[\s._-]+/).filter(Boolean);
-  return ((parts[0]?.[0] || "?") + (parts[1]?.[0] || "")).toUpperCase();
+  const lettered = parts.map((p) => p.replace(/^\p{N}+/u, "")).filter(Boolean);
+  const use = lettered.length ? lettered : parts;
+  return ((use[0]?.[0] || "?") + (use[1]?.[0] || "")).toUpperCase();
 }
 
 function Avatar({ profile, size = 20 }) {
@@ -285,7 +289,6 @@ export default function AgencyTracker() {
       clearTimeout(timer);
       supabase.removeChannel(channel);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Update UI dulu (optimistic), lalu tulis ke Supabase. Kalau gagal, muat ulang dari server.
@@ -314,7 +317,7 @@ export default function AgencyTracker() {
         urgent.slice(0, 5).forEach((t) => {
           const d = daysUntil(t.due, todayStr);
           const label = d < 0 ? `Lewat ${-d} hari` : d === 0 ? "Deadline hari ini" : "Deadline besok";
-          new Notification(`${label}: ${t.title}`, { body: clientOfStatic(t.client), silent: true });
+          new Notification(`${label}: ${t.title}`, { body: clients.find((c) => c.id === t.client)?.name || "", silent: true });
         });
       };
       if (Notification.permission === "granted") fire();
@@ -324,12 +327,7 @@ export default function AgencyTracker() {
     } catch (e) {
       // Notifikasi tidak tersedia di browser ini; banner tenggat tetap tampil.
     }
-  }, [loaded, tasks, todayStr]);
-
-  function clientOfStatic(id) {
-    const c = clients.find((x) => x.id === id);
-    return c ? c.name : "";
-  }
+  }, [loaded, tasks, todayStr, clients]);
 
   const fallbackClient = { id: "", name: "", short: "", color: "#6B6A64", tint: "#EEEDE8" };
   const clientOf = (id) => clients.find((c) => c.id === id) || clients[clients.length - 1] || fallbackClient;
@@ -550,6 +548,7 @@ export default function AgencyTracker() {
   function openFromNotification(n) {
     if (n.postId) {
       changeWorkspace("content");
+      // eslint-disable-next-line react-hooks/purity -- dipanggil saat notifikasi diklik, bukan saat render
       setOpenPostReq({ id: n.postId, at: Date.now() });
       return;
     }
@@ -983,7 +982,7 @@ export default function AgencyTracker() {
                     <Icon name="lock" size={15} />
                     <span className="grow">Ganti password</span>
                   </button>
-                  <button className="popover-item" onClick={() => { setUserMenuOpen(false); supabase.auth.signOut(); }} style={{ color: "var(--danger)" }}>
+                  <button className="popover-item" onClick={() => { setUserMenuOpen(false); clearAllDrafts(); supabase.auth.signOut(); }} style={{ color: "var(--danger)" }}>
                     <Icon name="logout" size={15} />
                     <span className="grow">Keluar</span>
                   </button>
